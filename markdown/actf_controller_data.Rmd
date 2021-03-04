@@ -73,3 +73,26 @@ wage_tax_revenue %>%
   kable_styling()
 
 ```
+
+Wage tax reveues during March, 2020 - February, 2021 relative to March, 2019 - February, 2020.
+
+As gross (in millions of US dollars, unadjusted for inflation) and as a percentage change.
+
+```{r, message = FALSE, warning = FALSE}
+wage_tax_revenue %>%
+  mutate(pandemic = case_when(year == 2020 & month >=3 ~ "March2020_Feb2021",
+                              year == 2021 ~ "March2020_Feb2021",
+                              year == 2020 & month <3 ~ "March2019_Feb2020",
+                              year == 2019 & month > 3 ~ "March2019_Feb2020")) %>%
+  filter(is.na(pandemic) == FALSE) %>%
+  select(-date, -month, -year ) %>%
+  gather(-pandemic, key = "variable", value = "value") %>%
+  group_by(pandemic, variable) %>%
+  summarize(sum = sum(value)) %>%
+  mutate(sum = round((sum/1000000), digits = 2)) %>%
+  spread(pandemic, sum) %>%
+  mutate(Pct_Change = round(100*((March2020_Feb2021 - March2019_Feb2020)/ March2019_Feb2020), digits = 2)) %>%
+  kable() %>%
+  kable_styling()
+
+```
