@@ -14,6 +14,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(readxl)
 library(lubridate)
 library(kableExtra)
 
@@ -38,13 +39,9 @@ wage_tax_revenue <- read_excel("~/GitHub/ACTF_nightlife/data/wage-tax-revenue.xl
          month = month(ymd(date)))
 ```
 
-## R Markdown
+Data on wage tax revenues obtained from Philadelphia Controller's Office, 3/2/2021
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r, message = FALSe, warning = FALSE}
+```{r, message = FALSE, warning = FALSE}
 wage_tax_revenue %>%
   select(-year, -month, -Total) %>%
   gather(-date, key = "variable", value = "value") %>%
@@ -64,7 +61,7 @@ wage_tax_revenue %>%
 
 Tax revenues by year in millions of dollars
 
-```{r, message = FALSe, warning = FALSE}
+```{r, message = FALSE, warning = FALSE}
 wage_tax_revenue %>%
   select(-date, -month ) %>%
   gather(-year, key = "variable", value = "value") %>%
