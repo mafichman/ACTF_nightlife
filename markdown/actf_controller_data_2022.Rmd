@@ -146,8 +146,8 @@ wage_tax_revenue_new %>%
     ylab("Quarterly Wage Tax Revenue ($ Millions)")+
     xlab("Date")+
     labs(
-        title = "Philadelphia Wage Tax Receipts vs. Pre-Pandemic Trends",
-        subtitle = "Adjusted for inflation to 2021 Dollars. Source: Philadelphia City Controller's Office, BLS")+
+        title = "Philadelphia Wage Tax Shortfalls",
+        subtitle = "Adjusted for inflation to 2021 Dollars.\n Trend based on 2014-2019 regression controlling for year, quarter, sector. \nSource: Philadelphia City Controller's Office, BLS")+
     plotTheme
 
 ```
@@ -175,7 +175,7 @@ wage_tax_revenue_new %>%
 
 ```
 
-Total tax losses (compared to pre-pandemic trend) since March, 2020, in millions (2021 dollars)
+Total tax shortfalls (compared to pre-pandemic trend) since March, 2020, in millions (2021 dollars)
 
 ```{r loss_summary, message = FALSE, warning = FALSE}
 
