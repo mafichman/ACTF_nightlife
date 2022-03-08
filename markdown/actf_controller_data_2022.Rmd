@@ -56,11 +56,23 @@ wage_tax_revenue_new <- read.csv("https://phl-budget-datasette.herokuapp.com/rev
                            year == 2021 ~ total))
 ```
 
-Data on wage tax revenues obtained from Philadelphia Controller's Office, 3/8/2022.
+# About
+
+Analysis by Michael Fichman of Philadelphia City Council's Arts and Culture Task Force, Nightlife Committee of wage tax revenue data obtained from Philadelphia Controller's Office, updated for the 2021 tax year, 3/8/2022.
+
+For code base used to synthesize these data, refer to the code download button at the top of this document or visit the github repository for this page - https://github.com/mafichman/ACTF_nightlife
+
+Questions, contact mfichman@upenn.edu
+
+# Wage Tax Receipts
+
+Quarterly wage tax receipts for industries in the arts and hospitality were dramatically impacted by the pandemic which began in March, 2020, and have not fully recovered. 
+
+Data on nighttime-specific industries tend not to be subdivided by day and nighttime activity in wage tax data.
 
 All dollar values adjusted for inflation (2021 dollars) based on BLS guidelines.
 
-```{r, message = FALSE, warning = FALSE}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 wage_tax_revenue_new %>%
   group_by(date, sector) %>%
   summarize(sum = sum(total),
@@ -74,11 +86,9 @@ wage_tax_revenue_new %>%
     subtitle = "Adjusted for inflation to 2021 Dollars. Source: Philadelphia City Controller's Office, BLS")+
   plotTheme
 ```
-
-
 Tax revenues by year in millions of dollars
 
-```{r, message = FALSE, warning = FALSE}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 wage_tax_revenue_new %>%
   group_by(year, sector) %>%
   summarize(sum = sum(total)) %>%
@@ -88,12 +98,13 @@ wage_tax_revenue_new %>%
   kable_styling()
 
 ```
+# Changes In Tax Revenue in Pandemic Year 1
 
 Year over year losses - Pandemic Year 1 - Wage tax revenues during March, 2020 - December, 2021 relative to March, 2019 - February, 2020.
 
 As gross (in millions of US dollars, adjust for inflation to 2021 dollars) and as a percentage change.
 
-```{r, message = FALSE, warning = FALSE}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 wage_tax_revenue %>%
   mutate(pandemic = case_when(year == 2020 & month >=3 ~ "March2020_Feb2021",
                               year == 2021 ~ "March2020_Feb2021",
@@ -114,12 +125,14 @@ wage_tax_revenue %>%
 
 ```
 
-Loss Estimates and Recovery Timeline
+# Loss Estimates and Recovery Timeline
 
-Trend estimates - linear model based on year, quarter, and sector from January, 2014-February, 2020. Model explains >98% of variance in pre-pandemic, inflation-adjusted, tax receipts.
+Tax revenues by the end of 2021 are still falling short of expected, meaning that recovery has not been achieved. Expected revenues are based on 2014-2020(TY Q1) trends (based on year, quarter and sector) and adjusted for inflation to 2021 dollars.
 
-```{r model, warning = FALSE, message = FALSE}
+```{r model, warning = FALSE, message = FALSE, include=FALSE}
 model <- lm(data = wage_tax_revenue_new %>% filter(year < 2020) %>% select(sector, fiscal_quarter, year, total), total ~ fiscal_quarter + year + sector)
+
+summary(model)
 
 
 predict(model, wage_tax_revenue_new) %>% 
@@ -128,7 +141,9 @@ predict(model, wage_tax_revenue_new) %>%
   cbind(., wage_tax_revenue_new) -> wage_tax_revenue_new
 ```
 
-```{r projection_chart, warning = FALSE, message = FALSE}
+Projected revenues are climbing back towards pre-pandemic status-quo.
+
+```{r projection_chart, warning = FALSE, message = FALSE, include=FALSE}
 wage_tax_revenue_new %>%
   group_by(date, sector, year, month) %>% 
   summarize(Actual = sum(total), 
@@ -152,7 +167,9 @@ wage_tax_revenue_new %>%
 
 ```
 
-```{r projection_chart_bar, warning = FALSE, message = FALSE}
+Wage tax losses since the beginning of 2020, relative to projections based on 2014-19, are still as much as $2 million per quarter by sector.
+
+```{r projection_chart_bar, warning = FALSE, message = FALSE, include=FALSE}
 wage_tax_revenue_new %>%
   group_by(date, sector, year, month) %>% 
   summarize(Actual = sum(total), 
@@ -177,7 +194,7 @@ wage_tax_revenue_new %>%
 
 Total tax shortfalls (compared to pre-pandemic trend) since March, 2020, in millions (2021 dollars)
 
-```{r loss_summary, message = FALSE, warning = FALSE}
+```{r loss_summary, message = FALSE, warning = FALSE, include=FALSE}
 
 wage_tax_revenue_new %>%
   group_by(date, sector, year, month) %>% 
@@ -187,6 +204,7 @@ wage_tax_revenue_new %>%
   ungroup() %>%
   filter(year == 2020 & month >=3 | year > 2020) %>%
   group_by(sector) %>%
-  summarize(total_loss_m = round(sum(loss)/1000000, digits = 2))
+  summarize(total_loss_m = round(sum(loss)/1000000, digits = 2)) %>%
+  kable()
 
 ```
