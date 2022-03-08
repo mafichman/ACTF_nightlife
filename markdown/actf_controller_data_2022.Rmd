@@ -208,3 +208,7 @@ wage_tax_revenue_new %>%
   kable()
 
 ```
+
+# Next up 
+
+Mobility trends, Save our Stages Grants, PPP data, Illuminate the Arts grants
