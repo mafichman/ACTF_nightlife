@@ -1,7 +1,7 @@
 ---
 title: "ACTF Nightlife Data Analysis and Outputs"
 author: "Michael Fichman"
-date: "March 8, 2022"
+date: "April 8, 2022"
 output: 
   html_document:
     toc: true
@@ -17,6 +17,14 @@ library(tidyverse)
 library(readxl)
 library(lubridate)
 library(kableExtra)
+library(leaflet)
+library(leaflet.extras)
+library(leaflet.providers)
+library(sf)
+library(ggmap)
+library(DT)
+library(tigris)
+library(mapview)
 
 plotTheme <- theme(
   plot.title =element_text(size=12),
@@ -32,6 +40,26 @@ plotTheme <- theme(
   # Format the grid
   panel.grid.major=element_line(colour="#D0D0D0",size=.75),
   axis.ticks=element_blank())
+
+mapTheme <- theme(plot.title =element_text(size=12),
+                  plot.subtitle = element_text(size=8),
+                  plot.caption = element_text(size = 6),
+                  axis.line=element_blank(),
+                  axis.text.x=element_blank(),
+                  axis.text.y=element_blank(),
+                  axis.ticks=element_blank(),
+                  axis.title.x=element_blank(),
+                  axis.title.y=element_blank(),
+                  panel.background=element_blank(),
+                  panel.border=element_blank(),
+                  panel.grid.major=element_line(colour = 'transparent'),
+                  panel.grid.minor=element_blank(),
+                  legend.direction = "vertical", 
+                  legend.position = "right",
+                  plot.margin = margin(1, 1, 1, 1, 'cm'),
+                  legend.key.height = unit(1, "cm"), legend.key.width = unit(0.2, "cm"))
+
+
 
 wage_tax_revenue <- read_excel("~/GitHub/ACTF_nightlife/data/wage-tax-revenue.xlsx") %>%
   rename(Arts_Entertainment_Recreation = 'Arts, Entertainment, and Other Recreation') %>%
@@ -210,6 +238,302 @@ wage_tax_revenue_new %>%
 
 ```
 
+# Save Our Stages Grants
+
+This repo contains interactive maps and analysis of SBA Grants given as part of the "Save Our Stages" Act passed by the US Congress.
+
+The data being used here have been geocoded using the Google Geocoding service, which is highly accurate but not error free. Data are current as of August 17, 2021, and are available [from the SBA](https://data.sba.gov/dataset/svog/resource/33270c2a-f1c5-4dcb-bc98-aedcaec19ef3).
+
+The following map shows the grantee locations.
+
+```{r venues, echo = FALSE, message = FALSE, warning = FALSE}
+geocoded_venues <- read.csv("~/GitHub/SaveOurStagesGrants/data/geocoded_venues.csv") %>%
+  rename(acct_type = 'Account.Venue') %>%
+  filter(City == "Philadelphia" & State == "PA")
+
+l <- leaflet() %>% 
+  addProviderTiles(providers$Esri.WorldTopoMap) %>%
+  setView(lng = mean(geocoded_venues$lon, na.rm = TRUE),
+          lat = mean(geocoded_venues$lat, na.rm = TRUE),
+          zoom = 10) %>%
+  addScaleBar(position = "topleft") %>%
+  addCircleMarkers(data= geocoded_venues %>%
+                     filter(acct_type == "Live performing arts organization operator"),
+                   lng=~lon, 
+                   lat=~lat,
+                   radius =~ 1, 
+                   fillOpacity =~ 0.5,
+                   color= "blue", # "~pal(acct_type)"
+                   label=~paste(svog_grantee, " | Grant $", svog_amount),
+                   group= "Live performing arts organization operator") %>%
+  addCircleMarkers(data= geocoded_venues %>%
+                     filter(acct_type == "Live venue operator or promoter"),
+                   lng=~lon, 
+                   lat=~lat,
+                   radius =~ 1, 
+                   fillOpacity =~ 0.5,
+                   color= "blue", # "~pal(acct_type)"
+                   label=~paste(svog_grantee, " | Grant $", svog_amount),
+                   group= "Live venue operator or promoter") %>%
+  addCircleMarkers(data= geocoded_venues %>%
+                     filter(acct_type == "Motion picture theater operator"),
+                   lng=~lon, 
+                   lat=~lat,
+                   radius =~ 1, 
+                   fillOpacity =~ 0.5,
+                   color= "blue", # "~pal(acct_type)"
+                   label=~paste(svog_grantee, " | Grant $", svog_amount),
+                   group= "Motion picture theater operator") %>%
+  addCircleMarkers(data= geocoded_venues %>%
+                     filter(acct_type == "Museum Operator"),
+                   lng=~lon, 
+                   lat=~lat,
+                   radius =~ 1, 
+                   fillOpacity =~ 0.5,
+                   color= "blue", # "~pal(acct_type)"
+                   label=~paste(svog_grantee, " | Grant $", svog_amount),
+                   group= "Museum Operator") %>%
+  addCircleMarkers(data= geocoded_venues %>%
+                     filter(acct_type == "Talent representative"),
+                   lng=~lon, 
+                   lat=~lat,
+                   radius =~ 1, 
+                   fillOpacity =~ 0.5,
+                   color= "blue", # "~pal(acct_type)"
+                   label=~paste(svog_grantee, " | Grant $", svog_amount),
+                   group= "Talent representative") %>%
+  addCircleMarkers(data= geocoded_venues %>%
+                     filter(acct_type == "Theatrical producer"),
+                   lng=~lon, 
+                   lat=~lat,
+                   radius =~ 1, 
+                   fillOpacity =~ 0.5,
+                   color= "blue", # "~pal(acct_type)"
+                   label=~paste(svog_grantee, " | Grant $", svog_amount),
+                   group= "Theatrical producer") %>%
+  addLayersControl(
+    overlayGroups = c("Live performing arts organization operator", 
+                      "Live venue operator or promoter",
+                      "Motion picture theater operator",
+                      "Museum Operator",
+                      "Talent representative",
+                      "Theatrical producer") ,
+    options = layersControlOptions(collapsed = TRUE)
+    ) %>%
+  hideGroup(c("Live performing arts organization operator", 
+                      "Motion picture theater operator",
+                      "Museum Operator",
+                      "Talent representative",
+                      "Theatrical producer"))
+
+l
+
+```
+# Philadelphia SVOG grant breakdown:
+
+```{r svog_breakdown, message = FALSE, echo = FALSE, warning = FALSE}
+geocoded_venues %>%
+  summarize("Num Grants" = n(),
+            "Grants Total" = sum(svog_amount),
+            "Mean Grant" = mean(svog_amount),
+            "Median Grant" = median(svog_amount)) %>%
+  kable() %>%
+  kable_styling()
+```
+
+# Philadelphia SVOG searchable database:
+
+```{r searchable_table, echo=FALSE, message=FALSE, warning=FALSE}
+datatable(geocoded_venues %>%
+            select(-X, -lon, -lat, -address_full) %>%
+            rename('Grant ($)' = svog_amount,
+                   Grantee = svog_grantee,
+                   Category = acct_type), 
+          options = list(pageLength = 10))
+```
+# Bike Share and Mobility
+
+# Philadelphia Bike Share Q2, 2021
+
+```{r load_mobility, message=TRUE, warning=FALSE, include=FALSE}
+url <-"https://u626n26h74f16ig1p3pt0f2g-wpengine.netdna-ssl.com/wp-content/uploads/2021/04/indego-trips-2021-q1.zip"
+
+temp <- tempfile()
+temp2 <- tempfile()
+
+download.file(url, temp)
+unzip(zipfile = temp, exdir = temp2)
+q1_2021 <- read.csv(file.path(temp2, "indego-trips-2021-q1.csv"))
+
+unlink(c(temp, temp2))
+
+url <-"https://u626n26h74f16ig1p3pt0f2g-wpengine.netdna-ssl.com/wp-content/uploads/2021/07/indego-trips-2021-q2.zip"
+
+temp <- tempfile()
+temp2 <- tempfile()
+
+download.file(url, temp)
+unzip(zipfile = temp, exdir = temp2)
+q2_2021 <- read.csv(file.path(temp2, "indego-trips-2021-q2.csv"))
+
+unlink(c(temp, temp2))
+
+url <-"https://u626n26h74f16ig1p3pt0f2g-wpengine.netdna-ssl.com/wp-content/uploads/2021/10/indego-trips-2021-q3.zip"
+
+temp <- tempfile()
+temp2 <- tempfile()
+
+download.file(url, temp)
+unzip(zipfile = temp, exdir = temp2)
+q3_2021 <- read.csv(file.path(temp2, "indego-trips-2021-q3.csv"))
+
+unlink(c(temp, temp2))
+
+url <-"https://u626n26h74f16ig1p3pt0f2g-wpengine.netdna-ssl.com/wp-content/uploads/2022/01/indego-trips-2021-q4.zip"
+
+temp <- tempfile()
+temp2 <- tempfile()
+
+download.file(url, temp)
+unzip(zipfile = temp, exdir = temp2)
+q4_2021 <- read.csv(file.path(temp2, "indego-trips-2021-q4.csv"))
+
+unlink(c(temp, temp2))
+
+dat <- q1_2021 %>%
+  rbind(., q2_2021) %>%
+  rbind(., q3_2021) %>%
+  rbind(., q4_2021)
+
+remove(q1_2021)
+remove(q2_2021)
+remove(q3_2021)
+remove(q4_2021)
+
+phila_shp <- counties("PA") %>%
+  filter(NAME == "Philadelphia") %>%
+  st_as_sf(crs = 4326)
+
+dat2 <- dat %>%
+  mutate(interval60 = floor_date(mdy_hm(start_time), unit = "hour"),
+         interval15 = floor_date(mdy_hm(start_time), unit = "15 mins"),
+         week = week(interval60),
+         dotw = wday(interval60, label=TRUE))
+```
+
+
+```{r mobility_trends, warning = FALSE, echo = TRUE, message = FALSE}
+ggplot(dat2 %>%
+         group_by(interval60) %>%
+         tally())+
+  geom_line(aes(x = interval60, y = n))+
+  labs(title="Bike share trips per hr. Philadelphia, 2021",
+       x="Date (2021)", 
+       y="Trips per hour")+
+  plotTheme
+
+ggplot(dat2 %>% mutate(hour = hour(mdy_hm(start_time)),
+                       month = month(mdy_hm(start_time)),
+                       day_type = ifelse(dotw %in% c("Sat", "Sun", "Fri"), "Weekend", "Weekday"),
+                       month = case_when(month == 1 ~ "01-2021",
+                                         month == 2 ~ "02-2021",
+                                         month == 3 ~ "03-2021",
+                                         month == 4 ~ "04-2021",
+                                         month == 5 ~ "05-2021",
+                                         month == 6 ~ "06-2021",
+                                         month == 7 ~ "07-2021",
+                                         month == 8 ~ "08-2021",
+                                         month == 9 ~ "09-2021",
+                                         month == 10 ~ "10-2021",
+                                         month == 11 ~ "11-2021",
+                                         month == 12 ~ "12-2021")))+
+  geom_rect(aes(xmin=0,
+                xmax = 6,
+                ymin = 0,
+                ymax = Inf), fill = 'light grey', alpha = 0.05)+
+  geom_rect(aes(xmin=18,
+                xmax = 24,
+                ymin = 0,
+                ymax = Inf), fill = 'light grey', alpha = 0.05)+
+  geom_freqpoly(aes(hour, color = day_type), binwidth = 1)+
+  scale_x_continuous(name="Hour", breaks=seq(0,24,6))+
+  labs(title="Total Bike Share Trips",
+       subtitle = "Philadelphia, 2021",
+       x="Hour", 
+       y="Trips")+
+  facet_wrap(~month)+
+  theme(legend.title = element_blank())+
+  plotTheme
+```
+
+
+```{r mobility_map, message = FALSE, warning = FALSE, echo = FALSE}
+ggplot(dat2 %>%
+         mutate(time_of_day = ifelse(hour(interval60) < 4 | 
+                                       hour(interval60) > 20, 
+                                     "Night", 
+                                     "Day"),
+                month = month(mdy_hm(start_time)),
+                month = case_when(month == 1 ~ "01-2021",
+                                                    month == 2 ~ "02-2021",
+                                                    month == 3 ~ "03-2021",
+                                                    month == 4 ~ "04-2021",
+                                                    month == 5 ~ "05-2021",
+                                                    month == 6 ~ "06-2021",
+                                                    month == 7 ~ "07-2021",
+                                                    month == 8 ~ "08-2021",
+                                                    month == 9 ~ "09-2021",
+                                                    month == 10 ~ "10-2021",
+                                                    month == 11 ~ "11-2021",
+                                                    month == 12 ~ "12-2021")) %>%
+         group_by(start_station, time_of_day, start_lon, start_lat, month) %>%
+         tally() %>%
+         filter(time_of_day == "Night")) +
+  geom_sf(data = phila_shp, fill = "black")+
+  geom_point(aes(x = start_lon, y = start_lat, color = n), alpha = 0.8)+
+  scale_color_viridis_c()+
+  guides(color=guide_legend(title="Trips"))+
+  labs(title="Gross Bike Share Trips By Origin - 20:00-4:00, Q2, 2021")+
+  facet_wrap(~month)+
+  mapTheme
+```
+# Zoning and Assembly Licenses
+
+```{r dl_zoning, message = FALSE, warning = FALSE, echo = FALSE}
+
+zones <- st_read("https://opendata.arcgis.com/datasets/0bdb0b5f13774c03abf8dc2f1aa01693_0.geojson") %>%
+  st_as_sf(crs = 4326) %>%
+  mutate(assembly_allowed = ifelse(LONG_CODE %in% 
+                                     c("CMX-4", "CMX-5", "CA-2", "ICMX"),
+                                   "By-Right", 
+                                   ifelse(LONG_CODE %in% 
+                                            c("CMX-2", "CMX-2.5", "CMX-3", "IRMX"),
+                                          "Special Exception", 
+                                          "Not Permitted" )))
+
+```
+```{r map_zones}
+mapview(zones, zcol = "assembly_allowed")
+```
+
+Overlays
+
+```{r overlays}
+overlays <- st_read("https://opendata.arcgis.com/datasets/04fd29a8c022471994900cb0fd791bfc_0.geojson") %>%
+  st_as_sf(crs = 4326)
+```
+
+Entertainment licenses
+
+```{r business_licenses}
+licenses <- st_read("https://phl.carto.com/api/v2/sql?q=SELECT+*+FROM+business_licenses&filename=business_licenses&format=geojson&skipfields=cartodb_id") %>%
+  st_as_sf(crs = 4326)
+
+```
+```{r map_licenses}
+mapview(licenses %>% filter(str_detect(licensetype, "Special Assembly") == TRUE), zcol = "licensestatus")
+```
+
 # Next up 
 
-Mobility trends, Save our Stages Grants, PPP data, Illuminate the Arts grants
+zoning, overlays, entertainment licenses, Mobility trends, PPP data, Illuminate the Arts grants
