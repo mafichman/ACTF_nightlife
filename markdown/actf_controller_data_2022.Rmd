@@ -86,13 +86,15 @@ wage_tax_revenue_new <- read.csv("https://phl-budget-datasette.herokuapp.com/rev
 
 # About
 
-Analysis by Michael Fichman of Philadelphia City Council's Arts and Culture Task Force, Nightlife Committee of wage tax revenue data obtained from Philadelphia Controller's Office, updated for the 2021 tax year, 3/8/2022.
+This document contains analysis of recent data regarding wage taxes, licensing, zoning, and mobility related to Philadelphia's nighttime economy.
+
+Analysis by Michael Fichman of Philadelphia City Council's Arts and Culture Task Force, Nightlife Committee of wage tax revenue data obtained from Philadelphia Controller's Office, updated for the 2021 tax year, 3/8/2022. All other data obtained from Open Data Philly or Indigo Bike Share, April, 2022.
 
 For code base used to synthesize these data, refer to the code download button at the top of this document or visit the github repository for this page - https://github.com/mafichman/ACTF_nightlife
 
 Questions, contact mfichman@upenn.edu
 
-# Wage Tax Receipts
+# 1. Hospitality Wage Tax Receipts, 2014-2022
 
 Quarterly wage tax receipts for industries in the arts and hospitality were dramatically impacted by the pandemic which began in March, 2020, and have not fully recovered. 
 
@@ -115,7 +117,7 @@ wage_tax_revenue_new %>%
   plotTheme
 ```
 
-Tax revenues by year in millions of dollars
+## 1.1. Tax revenues by year in millions of dollars
 
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
 wage_tax_revenue_new %>%
@@ -127,7 +129,7 @@ wage_tax_revenue_new %>%
   kable_styling()
 
 ```
-# Changes In Tax Revenue in Pandemic Year 1
+## 1.3 Tax Revenue in Pandemic Year 1
 
 Year over year losses - Pandemic Year 1 - Wage tax revenues during March, 2020 - December, 2021 relative to March, 2019 - February, 2020.
 
@@ -154,7 +156,7 @@ wage_tax_revenue %>%
 
 ```
 
-# Loss Estimates and Recovery Timeline
+## 1.3 Tax Loss Estimates and Recovery Timeline
 
 Tax revenues by the end of 2021 are still falling short of expected, meaning that recovery has not been achieved. Expected revenues are based on 2014-2020(TY Q1) trends (based on year, quarter and sector) and adjusted for inflation to 2021 dollars.
 
@@ -238,11 +240,13 @@ wage_tax_revenue_new %>%
 
 ```
 
-# Save Our Stages Grants
+# 2. Save Our Stages Grants
 
 This repo contains interactive maps and analysis of SBA Grants given as part of the "Save Our Stages" Act passed by the US Congress.
 
 The data being used here have been geocoded using the Google Geocoding service, which is highly accurate but not error free. Data are current as of August 17, 2021, and are available [from the SBA](https://data.sba.gov/dataset/svog/resource/33270c2a-f1c5-4dcb-bc98-aedcaec19ef3).
+
+## 2.2. Grantee map
 
 The following map shows the grantee locations.
 
@@ -329,7 +333,7 @@ l <- leaflet() %>%
 l
 
 ```
-# Philadelphia SVOG grant breakdown:
+# 2.2. Philadelphia SVOG grant breakdown:
 
 ```{r svog_breakdown, message = FALSE, echo = FALSE, warning = FALSE}
 geocoded_venues %>%
@@ -341,7 +345,7 @@ geocoded_venues %>%
   kable_styling()
 ```
 
-# Philadelphia SVOG searchable database:
+## 2.3. Phila SVOG searchable database:
 
 ```{r searchable_table, echo=FALSE, message=FALSE, warning=FALSE}
 datatable(geocoded_venues %>%
@@ -351,11 +355,187 @@ datatable(geocoded_venues %>%
                    Category = acct_type), 
           options = list(pageLength = 10))
 ```
-# Bike Share and Mobility
 
-# Philadelphia Bike Share Q2, 2021
 
-```{r load_mobility, message=TRUE, warning=FALSE, include=FALSE}
+# 3. Zoning and Assembly Licenses
+
+A Special Assembly Occupancy License (SAOL) is the highest form of license for assembly for entertainment for 50+ people (non-seated). In combination with an amusement license and regular business licenses, this is what you usually need to open a venue. These licenses are difficult to get, and can be expensive. Much expense and risk is incurred when you need a zoning variance (and council approval) or to go through a zoning process triggered by a special exception.
+
+SAOLs are only available by right in very few zoning categories, most of these the most expensive land in Center City. Recently, people have NOT been taking out licenses in CC, they have been going through zoning processes in nearby neighborhoods with transit access and clusters of amenities, and SAOLs have been going extinct much faster than they are being created.
+
+There are a few opportunities for Council to make SAOLs easier to access - one is by supporting operators in getting variances, two is by opening up more zoning districts to SAOLs by right.
+
+[24HrPHL put together a "playbook" for how to obtain a SAOL in 2019 that was vetted by then L&I Commissioner Dave Perri.](http://24hrphl.org/the-venue-starter-playbook/)
+
+The number of active SAOLs in Philadelphia is declining, and the places where people want to (or can afford to) build creative spaces are not the places where they are available by-right. Only 28% of active SAOLs are in by-right districts. 
+
+Frequently, people are applying for SAOLs in CMX-2.5 properties - where this use is availabe by special exception *Opening CMX-2.5 to by-right SAOL would more than double the amount of commercial parcels eligible for by-right SAOL.*
+
+```{r dl_zoning, echo=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+
+zones <- st_read("https://opendata.arcgis.com/datasets/0bdb0b5f13774c03abf8dc2f1aa01693_0.geojson") %>%
+  st_as_sf(crs = 4326) %>%
+  mutate(assembly_allowed = ifelse(LONG_CODE %in% 
+                                     c("CMX-4", "CMX-5", "CA-2", "ICMX"),
+                                   "By-Right", 
+                                   ifelse(LONG_CODE %in% 
+                                            c("CMX-2", "CMX-2.5", "CMX-3", "IRMX"),
+                                          "Special Exception", 
+                                          "Not Permitted" )))
+
+licenses <- st_read("https://phl.carto.com/api/v2/sql?q=SELECT+*+FROM+business_licenses&filename=business_licenses&format=geojson&skipfields=cartodb_id") %>%
+  st_as_sf(crs = 4326)
+
+```
+## 3.1. Summary of SAOL-eligible Districts
+
+Assembly is allowed by right in four zoning districts, and by special exception in four others.
+
+Here are some very basic descriptions of these types of zones, with information sourced from Anastasio Law - http://phillyzoning.com/
+
+*By Right*
+
+-CA-2 - Auto-oriented commercial
+
+-CMX-4 - Commercial Mixed Use, mostly found in Center City or along major arterials like Broad, Market or Chestnut Streets
+
+-CMX-5 - Commercial Mixed Use, found in the core of Center City office districts
+
+-ICMX - Commercial/Industrial uses designed as a buffer between commercial and residential uses
+
+*Special Exception*
+
+-CMX-2 - Neighborhood commercial corridor, mixed use - e.g. Baltimore Avenue, Germantown Avenue
+
+-CMX-2.5 - Commercial mixed use designed to promote pedestrian-friendly uses
+
+-CMX-3 - Lower density commercial mixed use than CMX 4&5, found on major corridors like Kensington Ave, South St, Broad south of Washington.
+
+-IRMX - "Low impact" industrial, including artist spaces
+
+```{r explore_zones, message = FALSE, warning = FALSE, echo=FALSE}
+zones %>%
+  as.data.frame()%>%
+  filter(LONG_CODE %in% c("CMX-4", "CMX-5", "CA-2", "ICMX", "CMX-2", "CMX-2.5", "CMX-3", "IRMX")) %>%
+  group_by(assembly_allowed, LONG_CODE) %>%
+  tally() %>%
+  rename("Parcels city-wide" = n,
+         District = LONG_CODE) %>%
+  kable %>%
+  kable_styling()
+```
+
+City-wide, roughly 26% of *commercial* districts (by area) are zoned for assembly by right. Much of this area is in large Center City tracts where creative spaces are unlikely to be developed due to cost or constraints of the land.
+
+```{r pct_commercial_props, message = FALSE, warning = FALSE, echo=FALSE}
+zones %>%
+  filter(str_detect(ZONINGGROUP, "Commercial") == TRUE) %>%
+  st_transform(2272) %>%
+  mutate(area = st_area(.)) %>%
+  as.data.frame()%>%
+  group_by(assembly_allowed) %>%
+  summarize(sum_area = sum(area)) %>%
+  #rename(n_parcels = n) %>%
+  mutate(Pct = round(100*(sum_area / sum(sum_area)), 2)) %>%
+  #rename("Parcels City-Wide" = n_parcels) %>%
+  kable() %>%
+  kable_styling()
+```
+
+## 3.2. City-wide zoning examination
+
+The majority of areas zoned for assembly by-right are in Center City. This is *not* where most development of creative entertainment is taking place.
+
+Notice the licenses 
+
+```{r map_exceptions, message = FALSE, warning = FALSE, echo=FALSE}
+mapview(zones %>%
+          filter(assembly_allowed != "Not Permitted"),
+        zcol = "assembly_allowed") # +
+#mapview(licenses %>% 
+#  filter(licensetype == "Special Assembly Occupancy",
+#         licensestatus == "Active") %>% 
+#  st_join(., zones), zcol = "assembly_allowed")  
+```
+
+
+## 3.4. SAOL issuance timeline
+
+Very few SAOLs are issued in Philly, and especially few the last two years. The following chart shows the date when SAOL's were issued. 2006 probably has data inflated by the start of the record-keeping period for these data.
+
+```{r license_timeline, message = FALSE, warning = FALSE, echo=FALSE}
+licenses %>%
+  filter(licensetype == "Special Assembly Occupancy") %>%
+  mutate(year_opened = year(as.Date(initialissuedate))) %>%
+  group_by(year_opened) %>%
+  tally() %>%
+  ggplot()+
+  geom_histogram(aes(y = n, x = year_opened), stat = "identity") +
+  labs(title="Special Assembly Occupancy License Active Dates",
+       x="Year", 
+       y="Number of Licenses")+
+  plotTheme
+
+```
+
+Record numbers of licenses became inactive in 2020... The following chart shows the years in which SAOL's became inactive. Meanwhile, the real estate market is getting much more competitive and entertainment wages are slow to recover (see Section 1 of this document).
+
+```{r license_timeline_inactive, message = FALSE, warning = FALSE, echo=FALSE}
+licenses %>%
+  filter(licensetype == "Special Assembly Occupancy",
+         is.na(inactivedate) == FALSE) %>%
+  mutate(year_closed = year(as.Date(inactivedate))) %>%
+  group_by(year_closed) %>%
+  tally() %>%
+  ggplot()+
+  geom_histogram(aes(y = n, x = year_closed), stat = "identity") +
+  labs(title="Special Assembly Occupancy License Inactive Dates",
+       x="Year", 
+       y="Number of Licenses")+
+  plotTheme
+
+```
+
+```{r map_licenses, echo=FALSE}
+mapview(licenses %>% 
+  filter(licensetype == "Special Assembly Occupancy",
+         licensestatus == "Active") %>% 
+  st_join(., zones), zcol = "assembly_allowed")
+```
+
+Among active Special Assembly Occupancy Licenses, only 35 (28%) were permitted by right in the zones where they were created.
+
+```{r licenses_and_zones, echo=FALSE}
+licenses %>% 
+  filter(licensetype == "Special Assembly Occupancy",
+         licensestatus == "Active") %>% 
+  st_join(., zones) %>% 
+  as.data.frame() %>%
+  group_by(assembly_allowed, LONG_CODE) %>% 
+  tally() %>%
+  rename(n_licenses = n) %>%
+  left_join(., zones %>%
+              as.data.frame() %>%
+              group_by(LONG_CODE) %>%
+              tally() %>%
+              rename( total_zone_parcels = n)) %>%
+  group_by(assembly_allowed) %>%
+  summarize(n_licenses = sum(n_licenses)) %>%
+  mutate(pct = 100*(n_licenses / sum(n_licenses))) %>%
+  kable()
+  
+```
+
+# Next up 
+
+overlays, entertainment licenses, Mobility trends, PPP data, Illuminate the Arts grants
+
+
+Bike Share and Mobility
+
+Philadelphia Bike Share Q2, 2021
+
+```{r load_mobility, message=TRUE, warning=FALSE, include=FALSE, eval = FALSE}
 url <-"https://u626n26h74f16ig1p3pt0f2g-wpengine.netdna-ssl.com/wp-content/uploads/2021/04/indego-trips-2021-q1.zip"
 
 temp <- tempfile()
@@ -422,14 +602,14 @@ dat2 <- dat %>%
 ```
 
 
-```{r mobility_trends, warning = FALSE, echo = TRUE, message = FALSE}
+```{r mobility_trends, warning = FALSE, echo = TRUE, message = FALSE, eval = FALSE}
 ggplot(dat2 %>%
-         group_by(interval60) %>%
+         group_by(week) %>%
          tally())+
-  geom_line(aes(x = interval60, y = n))+
-  labs(title="Bike share trips per hr. Philadelphia, 2021",
-       x="Date (2021)", 
-       y="Trips per hour")+
+  geom_line(aes(x = week, y = n))+
+  labs(title="Bike share trips per week Philadelphia, 2021",
+       x="Week (2021)", 
+       y="Trips")+
   plotTheme
 
 ggplot(dat2 %>% mutate(hour = hour(mdy_hm(start_time)),
@@ -467,7 +647,8 @@ ggplot(dat2 %>% mutate(hour = hour(mdy_hm(start_time)),
 ```
 
 
-```{r mobility_map, message = FALSE, warning = FALSE, echo = FALSE}
+
+```{r mobility_map, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 ggplot(dat2 %>%
          mutate(time_of_day = ifelse(hour(interval60) < 4 | 
                                        hour(interval60) > 20, 
@@ -497,43 +678,3 @@ ggplot(dat2 %>%
   facet_wrap(~month)+
   mapTheme
 ```
-# Zoning and Assembly Licenses
-
-```{r dl_zoning, message = FALSE, warning = FALSE, echo = FALSE}
-
-zones <- st_read("https://opendata.arcgis.com/datasets/0bdb0b5f13774c03abf8dc2f1aa01693_0.geojson") %>%
-  st_as_sf(crs = 4326) %>%
-  mutate(assembly_allowed = ifelse(LONG_CODE %in% 
-                                     c("CMX-4", "CMX-5", "CA-2", "ICMX"),
-                                   "By-Right", 
-                                   ifelse(LONG_CODE %in% 
-                                            c("CMX-2", "CMX-2.5", "CMX-3", "IRMX"),
-                                          "Special Exception", 
-                                          "Not Permitted" )))
-
-```
-```{r map_zones}
-mapview(zones, zcol = "assembly_allowed")
-```
-
-Overlays
-
-```{r overlays}
-overlays <- st_read("https://opendata.arcgis.com/datasets/04fd29a8c022471994900cb0fd791bfc_0.geojson") %>%
-  st_as_sf(crs = 4326)
-```
-
-Entertainment licenses
-
-```{r business_licenses}
-licenses <- st_read("https://phl.carto.com/api/v2/sql?q=SELECT+*+FROM+business_licenses&filename=business_licenses&format=geojson&skipfields=cartodb_id") %>%
-  st_as_sf(crs = 4326)
-
-```
-```{r map_licenses}
-mapview(licenses %>% filter(str_detect(licensetype, "Special Assembly") == TRUE), zcol = "licensestatus")
-```
-
-# Next up 
-
-zoning, overlays, entertainment licenses, Mobility trends, PPP data, Illuminate the Arts grants
