@@ -413,7 +413,7 @@ Here are some very basic descriptions of these types of zones, with information 
 
 -IRMX - "Low impact" industrial, including artist spaces
 
-```{r explore_zones, message = FALSE, warning = FALSE, echo=FALSE}
+```{r explore_zones, message = FALSE, warning = FALSE, echo=FALSE, eval = FALSE}
 zones %>%
   as.data.frame()%>%
   filter(LONG_CODE %in% c("CMX-4", "CMX-5", "CA-2", "ICMX", "CMX-2", "CMX-2.5", "CMX-3", "IRMX")) %>%
@@ -446,12 +446,30 @@ zones %>%
 
 The majority of areas zoned for assembly by-right are in Center City. This is *not* where most development of creative entertainment is taking place.
 
-Notice the licenses 
+Take a look at districts outside Center City like Fishtown - by-right SAOL is not really allowed by-right anywhere.
 
-```{r map_exceptions, message = FALSE, warning = FALSE, echo=FALSE}
+When the license data from OpenDataPhilly are back online - this map will contain SAOL licence locations as well.
+
+DATA FROM OPENDATAPHILLY UNAVAILABLE 5/8/2022
+
+```{r map_exceptions, message = FALSE, warning = FALSE, echo=FALSE, fig.width=8, fig.height= 8}
 mapview(zones %>%
-          filter(assembly_allowed != "Not Permitted"),
-        zcol = "assembly_allowed") # +
+          filter(assembly_allowed %in% c("Special Exception", "By-Right")) %>%
+          mutate(LONG_CODE = case_when(LONG_CODE == "CA-2" ~ "By-Right CA-2",
+                                       LONG_CODE == "CMX-4" ~ "By-Right CMX-4",
+                                       LONG_CODE == "CMX-5" ~ "By-Right CMX-5",
+                                       LONG_CODE == "ICMX" ~ "By-Right ICMX",
+                                       LONG_CODE == "CMX-2" ~ "Spec Execpt CMX-2",
+                                       LONG_CODE == "CMX-2.5" ~ "Spec Execpt CMX-2.5",
+                                       LONG_CODE == "CMX-3" ~ "Spec Execpt CMX-3",
+                                       LONG_CODE == "IRMX" ~ "Spec Execpt IRMX")),
+        zcol = "LONG_CODE", col.regions=list("#ffffb2", "#fecc5c", "#fd8d3c", "#e31a1c",
+                                             "#edf8fb", "#b3cde3", "#8c96c6", "#88419d"),
+        col = list("transparent"),
+        layer.name = "Zoning Districts")
+
+
+# +
 #mapview(licenses %>% 
 #  filter(licensetype == "Special Assembly Occupancy",
 #         licensestatus == "Active") %>% 
@@ -463,7 +481,9 @@ mapview(zones %>%
 
 Very few SAOLs are issued in Philly, and especially few the last two years. The following chart shows the date when SAOL's were issued. 2006 probably has data inflated by the start of the record-keeping period for these data.
 
-```{r license_timeline, message = FALSE, warning = FALSE, echo=FALSE}
+DATA FROM OPENDATAPHILLY UNAVAILABLE 5/8/2022
+
+```{r license_timeline, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 licenses %>%
   filter(licensetype == "Special Assembly Occupancy") %>%
   mutate(year_opened = year(as.Date(initialissuedate))) %>%
@@ -480,7 +500,9 @@ licenses %>%
 
 Record numbers of licenses became inactive in 2020... The following chart shows the years in which SAOL's became inactive. Meanwhile, the real estate market is getting much more competitive and entertainment wages are slow to recover (see Section 1 of this document).
 
-```{r license_timeline_inactive, message = FALSE, warning = FALSE, echo=FALSE}
+DATA FROM OPENDATAPHILLY UNAVAILABLE 5/8/2022
+
+```{r license_timeline_inactive, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 licenses %>%
   filter(licensetype == "Special Assembly Occupancy",
          is.na(inactivedate) == FALSE) %>%
@@ -496,7 +518,7 @@ licenses %>%
 
 ```
 
-```{r map_licenses, echo=FALSE}
+```{r map_licenses, echo=FALSE, eval = FALSE, include = FALSE}
 mapview(licenses %>% 
   filter(licensetype == "Special Assembly Occupancy",
          licensestatus == "Active") %>% 
@@ -505,7 +527,9 @@ mapview(licenses %>%
 
 Among active Special Assembly Occupancy Licenses, only 35 (28%) were permitted by right in the zones where they were created.
 
-```{r licenses_and_zones, echo=FALSE}
+DATA FROM OPENDATAPHILLY UNAVAILABLE 5/8/2022
+
+```{r licenses_and_zones, echo=FALSE, eval = FALSE, include = FALSE}
 licenses %>% 
   filter(licensetype == "Special Assembly Occupancy",
          licensestatus == "Active") %>% 
@@ -526,9 +550,18 @@ licenses %>%
   
 ```
 
-# Next up 
+Next steps - 
 
-overlays, entertainment licenses, Mobility trends, PPP data, Illuminate the Arts grants
+How has by-right vs. exception/variance changed over time?
+How is this related to property costs / tax rates / valuation?
+How many SAOLs are also getting amusement licenses? How many can we verify are music venues?
+Are temporary assembly licenses in the data set?
+
+DATA FROM OPENDATAPHILLY UNAVAILABLE 5/8/2022
+
+# Next up for analysis
+
+overlays, Mobility trends, PPP data, Illuminate the Arts grants
 
 
 Bike Share and Mobility
