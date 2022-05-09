@@ -1,7 +1,7 @@
 ---
 title: "ACTF Nightlife Data Analysis and Outputs"
 author: "Michael Fichman"
-date: "April 8, 2022"
+date: "May 8, 2022"
 output: 
   html_document:
     toc: true
@@ -88,7 +88,9 @@ wage_tax_revenue_new <- read.csv("https://phl-budget-datasette.herokuapp.com/rev
 
 This document contains analysis of recent data regarding wage taxes, licensing, zoning, and mobility related to Philadelphia's nighttime economy.
 
-Analysis by Michael Fichman of Philadelphia City Council's Arts and Culture Task Force, Nightlife Committee of wage tax revenue data obtained from Philadelphia Controller's Office, updated for the 2021 tax year, 3/8/2022. All other data obtained from Open Data Philly or Indigo Bike Share, April, 2022.
+Analysis by Michael Fichman of Philadelphia City Council's Arts and Culture Task Force, Nightlife Committee. 
+
+Wage tax revenue data obtained from Philadelphia Controller's Office, updated for the 2021 tax year, 3/8/2022. All other data obtained from Open Data Philly or Indigo Bike Share, April, 2022.
 
 For code base used to synthesize these data, refer to the code download button at the top of this document or visit the github repository for this page - https://github.com/mafichman/ACTF_nightlife
 
