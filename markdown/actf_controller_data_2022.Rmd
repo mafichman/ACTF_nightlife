@@ -163,7 +163,7 @@ wage_tax_revenue %>%
 Tax revenues by the end of 2021 are still falling short of expected, meaning that recovery has not been achieved. Expected revenues are based on 2014-2020(TY Q1) trends (based on year, quarter and sector) and adjusted for inflation to 2021 dollars.
 
 ```{r model, warning = FALSE, message = FALSE, include=FALSE}
-model <- lm(data = wage_tax_revenue_new %>% filter(year < 2020) %>% select(sector, fiscal_quarter, year, total), total ~ fiscal_quarter + year + sector)
+model <- lm(data = wage_tax_revenue_new %>% filter(year < 2020) %>% select(sector, fiscal_quarter, year, total), total ~ as.factor(fiscal_quarter) + year + sector)
 
 summary(model)
 
@@ -225,6 +225,26 @@ wage_tax_revenue_new %>%
 
 ```
 
+On a percentage basis, this looks like the following:
+
+```{r shortfall_pct, warning = FALSE, message = FALSE, echo=FALSE}
+wage_tax_revenue_new %>%
+    group_by(date, sector, year, month) %>% 
+    summarize(Actual = sum(total), 
+              Pre.Pandemic.Trend = sum(pred), 
+              pct_diff = 100*((Actual-Pre.Pandemic.Trend)/Pre.Pandemic.Trend)) %>%
+    filter(year >= 2020) %>%
+    ggplot()+
+    geom_bar(aes(x = as.Date(date), y=pct_diff), stat = "identity", position = "dodge")+ 
+    facet_wrap(~sector)+
+    ylab("Quarterly Tax Revenue vs. Expected (%)")+
+    xlab("Date")+
+    labs(
+        title = "Philadelphia Wage Tax - Percentage Shortfall vs Pre-Pandemic Trends",
+        subtitle = "Adjusted for inflation to 2021 Dollars.\n Trend based on 2014-2019 regression controlling for year, quarter, sector. \nSource: Philadelphia City Controller's Office, BLS")+
+    plotTheme
+```
+
 Total tax shortfalls (compared to pre-pandemic trend) since March, 2020, in millions (2021 dollars)
 
 ```{r loss_summary, echo=FALSE, message=FALSE, warning=FALSE}
@@ -242,13 +262,169 @@ wage_tax_revenue_new %>%
 
 ```
 
-# 2. Save Our Stages Grants
+# 2. Amusement Tax Receipts
+
+Data from Philadelphia City Controller's Office - 5/18/2022.
+
+Source:
+
+https://raw.githubusercontent.com/PhilaController/phl-budget-data/main/src/phl_budget_data/data/processed/revenue/city-collections.csv
+
+
+```{r load_amusement, message=FALSE, warning=FALSE, echo=FALSE}
+amusement <- read.csv("https://raw.githubusercontent.com/PhilaController/phl-budget-data/main/src/phl_budget_data/data/processed/revenue/city-collections.csv") %>%
+  filter(name == "amusement") %>%
+    mutate(year = year(ymd(date)),
+           month = month(ymd(date))) %>%
+  mutate(total = case_when(year == 2014 ~ total * 1.12,
+                           year == 2015 ~ total * 1.12,
+                           year == 2016 ~ total * 1.10,
+                           year == 2017 ~ total * 1.08,
+                           year == 2018 ~ total * 1.06,
+                           year == 2019 ~ total * 1.04,
+                           year == 2020 ~ total * 1.01,
+                           year == 2021 ~ total, 
+                           year == 2022 ~ total))
+
+```
+
+## 2.1. Timeline of Amusement Tax Revenues
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+amusement %>%
+  group_by(date) %>%
+  summarize(sum = sum(total),
+            sum = round((sum/1000000), digits = 2)) %>%
+  ggplot()+
+  geom_line(aes(x = as.Date(date), y=sum))+
+  ylab("Monthly Amusement Tax Revenue ($ Millions)")+
+  xlab("Date")+
+  labs(
+    title = "Philadelphia Amusement Tax Receipts",
+    subtitle = "Adjusted for inflation to 2021 Dollars. Source: Philadelphia City Controller's Office")+
+  plotTheme
+```
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+amusement %>%
+  group_by(year) %>%
+  summarize(sum = sum(total),
+            sum = round((sum/1000000), digits = 2)) %>%
+  ggplot()+
+  geom_bar(aes(x = year, y=sum), stat = "identity")+
+  ylab("Monthly Amusement Tax Revenue ($ Millions)")+
+  xlab("Date")+
+  labs(
+    title = "Philadelphia Amusement Tax Receipts",
+    subtitle = "2022 Data are through April. Adjusted for inflation to 2021 Dollars. Source: Philadelphia City Controller's Office")+
+  plotTheme
+
+
+```
+
+## 1.3. Tax Loss Estimates and Recovery Timeline
+
+Starting in late 2021, amusement tax revenues began to near pre-pandemic levels and seasonal patterns, but have only surpassed pre-2020 trends in one single month since the pandemic began. Monthly tax revenues are still off between 10-60% with some strong fluctuations from month to month.
+
+It's not clear whether this trend is homogeneous across the entertainment sector. Since March, 2020 - the total loss in amusement taxes is approximately $37.1M.
+
+Expected revenues are based on 2014-2020(TY Q1) trends (based on OLS models incorporating year and month) and adjusted for inflation to 2021 dollars.
+
+```{r model_amusement, warning = FALSE, message = FALSE, include=FALSE}
+model_amusement <- lm(data = amusement %>% filter(year < 2020) %>% select(month, year, total), total ~ as.factor(month) + year)
+
+summary(model_amusement)
+
+
+predict(model_amusement, amusement) %>% 
+  as.data.frame() %>% 
+  rename(pred = ".") %>% 
+  cbind(., amusement) -> amusement
+```
+
+```{r projection_chart_amusement, warning = FALSE, message = FALSE, echo=FALSE}
+amusement %>%
+  group_by(date, year, month) %>% 
+  summarize(Actual = sum(total), 
+            Pre.Pandemic.Trend = sum(pred)) %>% 
+  filter(year >= 2018) %>%
+  ungroup() %>%
+  select(date, Actual, Pre.Pandemic.Trend) %>%
+  gather(- date, key = "variable", value = "value") %>%
+  mutate(value_m = round(value/1000000, digits = 2)) %>%
+  ggplot()+
+    geom_line(aes(x = as.Date(date), y=value_m, color = variable))+ 
+    geom_line(aes(x = as.Date(date), y=value_m, color = variable), 
+            linetype = "dashed", alpha = 0.5)+
+    ylab("Quarterly Amusement Tax Revenue ($ Millions)")+
+    xlab("Date")+
+    labs(
+        title = "Philadelphia Amusement Tax Shortfalls",
+        subtitle = "Adjusted for inflation to 2021 Dollars.\n Trend based on 2014-2019 regression controlling for year, month, sector. \nSource: Philadelphia City Controller's Office")+
+    plotTheme
+
+```
+
+```{r projection_chart_bar2, warning = FALSE, message = FALSE, echo=FALSE}
+amusement %>%
+  group_by(date, year, month) %>% 
+  summarize(Actual = sum(total), 
+            Pre.Pandemic.Trend = sum(pred)) %>% 
+  mutate(loss = Actual - Pre.Pandemic.Trend) %>%
+  filter(year >= 2020) %>%
+  ungroup() %>%
+  select(date,  loss) %>%
+  gather(- date, key = "variable", value = "value") %>%
+  mutate(value_m = round(value/1000000, digits = 2)) %>%
+  ggplot()+
+    geom_bar(aes(x = as.Date(date), y=value_m), stat = "identity", color = "grey")+ 
+    ylab("Monthly Amusement Tax Revenue shortfall ($ Millions)")+
+    xlab("Date")+
+    labs(
+        title = "Philadelphia Amusement Tax Shortfall vs. Pre-Pandemic Trends",
+        subtitle = "Adjusted for inflation to 2021 Dollars. Source: Philadelphia City Controller's Office")+
+    plotTheme
+
+```
+
+```{r amusememt_shortfall_pct, warning = FALSE, message = FALSE, echo=FALSE}
+amusement %>%
+    group_by(date, year, month) %>% 
+    summarize(Actual = sum(total), 
+              Pre.Pandemic.Trend = sum(pred), 
+              pct_diff = 100*((Actual-Pre.Pandemic.Trend)/Pre.Pandemic.Trend)) %>%
+    filter(year >= 2020) %>%
+    ggplot()+
+    geom_bar(aes(x = as.Date(date), y=pct_diff), stat = "identity")+ 
+    ylab("Tax Revenue vs. Expected (%)")+
+    xlab("Date")+
+    labs(
+        title = "Philadelphia Amusement Tax - Percentage Shortfall vs Pre-Pandemic Trends",
+        subtitle = "Adjusted for inflation to 2021 Dollars.\n Trend based on 2014-2019 regression controlling for year, month. \nSource: Philadelphia City Controller's Office, BLS")+
+    plotTheme
+```
+
+```{r loss_summary_amusement, echo=FALSE, message=FALSE, warning=FALSE}
+
+amusement %>%
+  group_by(date, year, month) %>% 
+  summarize(Actual = sum(total), 
+            Pre.Pandemic.Trend = sum(pred)) %>% 
+  mutate(loss = Actual - Pre.Pandemic.Trend) %>%
+  ungroup() %>%
+  filter(year == 2020 & month >=3 | year > 2020) %>%
+  summarize("Est Loss (millions)" = round(sum(loss)/1000000, digits = 2)) %>%
+  kable()
+
+```
+
+# 3. Save Our Stages Grants
 
 This repo contains interactive maps and analysis of SBA Grants given as part of the "Save Our Stages" Act passed by the US Congress.
 
 The data being used here have been geocoded using the Google Geocoding service, which is highly accurate but not error free. Data are current as of August 17, 2021, and are available [from the SBA](https://data.sba.gov/dataset/svog/resource/33270c2a-f1c5-4dcb-bc98-aedcaec19ef3).
 
-## 2.2. Grantee map
+## 3.1. Grantee map
 
 The following map shows the grantee locations.
 
@@ -335,7 +511,7 @@ l <- leaflet() %>%
 l
 
 ```
-# 2.2. Philadelphia SVOG grant breakdown:
+# 3.2. Philadelphia SVOG grant breakdown:
 
 ```{r svog_breakdown, message = FALSE, echo = FALSE, warning = FALSE}
 geocoded_venues %>%
@@ -347,7 +523,7 @@ geocoded_venues %>%
   kable_styling()
 ```
 
-## 2.3. Phila SVOG searchable database:
+## 3.3. Phila SVOG searchable database:
 
 ```{r searchable_table, echo=FALSE, message=FALSE, warning=FALSE}
 datatable(geocoded_venues %>%
@@ -359,7 +535,7 @@ datatable(geocoded_venues %>%
 ```
 
 
-# 3. Zoning and Assembly Licenses
+# 4. Zoning and Assembly Licenses
 
 A Special Assembly Occupancy License (SAOL) is the highest form of license for assembly for entertainment for 50+ people (non-seated). In combination with an amusement license and regular business licenses, this is what you usually need to open a venue. These licenses are difficult to get, and can be expensive. Much expense and risk is incurred when you need a zoning variance (and council approval) or to go through a zoning process triggered by a special exception.
 
@@ -389,7 +565,7 @@ licenses <- st_read("https://phl.carto.com/api/v2/sql?q=SELECT+*+FROM+business_l
   st_as_sf(crs = 4326)
 
 ```
-## 3.1. Summary of SAOL-eligible Districts
+## 4.1. Summary of SAOL-eligible Districts
 
 Assembly is allowed by right in four zoning districts, and by special exception in four others.
 
@@ -444,7 +620,7 @@ zones %>%
   kable_styling()
 ```
 
-## 3.2. City-wide zoning examination
+## 4.2. City-wide zoning examination
 
 The majority of areas zoned for assembly by-right are in Center City. This is *not* where most development of creative entertainment is taking place.
 
@@ -473,7 +649,7 @@ mapview(zones %>%
 ```
 
 
-## 3.4. SAOL issuance timeline
+## 4.3. SAOL issuance timeline
 
 There are currently 122 SAOLs active in Philly, and 88 of those license holders also have amusement licenses.
 
