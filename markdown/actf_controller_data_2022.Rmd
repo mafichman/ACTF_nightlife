@@ -82,6 +82,12 @@ wage_tax_revenue_new <- read.csv("https://phl-budget-datasette.herokuapp.com/rev
                            year == 2019 ~ total * 1.04,
                            year == 2020 ~ total * 1.01,
                            year == 2021 ~ total))
+
+# County Shapefile
+phila_shp <- counties("PA") %>%
+  filter(NAME == "Philadelphia") %>%
+  st_as_sf(crs = 4326)
+
 ```
 
 # About
@@ -327,7 +333,7 @@ amusement %>%
 
 ## 1.3. Tax Loss Estimates and Recovery Timeline
 
-Starting in late 2021, amusement tax revenues began to near pre-pandemic levels and seasonal patterns, but have only surpassed pre-2020 trends in one single month since the pandemic began. Monthly tax revenues are still off between 10-50% with some strong fluctuations from month to month.
+Starting in late 2021, amusement tax revenues began to near pre-pandemic levels and seasonal patterns, but have only surpassed pre-2020 trends in two months since the pandemic began. Monthly tax revenues are still off between 10-50% with some strong fluctuations from month to month.
 
 It's not clear whether this trend is homogeneous across the entertainment sector. Since March, 2020 - the total loss in amusement taxes is approximately $37.1M.
 
@@ -363,7 +369,7 @@ amusement %>%
     xlab("Date")+
     labs(
         title = "Philadelphia Amusement Tax Shortfalls",
-        subtitle = "Adjusted for inflation to 2021 Dollars.\n Trend based on 2014-2019 regression controlling for year, month, sector. \nSource: Philadelphia City Controller's Office")+
+        subtitle = "Adjusted for inflation to 2021 Dollars.\n Trend based on 2014-2019 regression controlling for year, month. \nSource: Philadelphia City Controller's Office")+
     plotTheme
 
 ```
@@ -385,7 +391,7 @@ amusement %>%
     xlab("Date")+
     labs(
         title = "Philadelphia Amusement Tax Shortfall vs. Pre-Pandemic Trends",
-        subtitle = "Adjusted for inflation to 2021 Dollars. Source: Philadelphia City Controller's Office")+
+        subtitle = "Adjusted for inflation to 2021 Dollars.\nTrend based on 2014-2019 regression controlling for year, month. \nSource: Philadelphia City Controller's Office")+
     plotTheme
 
 ```
@@ -406,6 +412,8 @@ amusement %>%
         subtitle = "Adjusted for inflation to 2021 Dollars.\n Trend based on 2014-2019 regression controlling for year, month. \nSource: Philadelphia City Controller's Office, BLS")+
     plotTheme
 ```
+
+Estimated total losses in Amusement tax revenue since March, 2020. Based on differences between actual and predicted revenues from OLS regression controlling for year and seasonality (month), in 2021 dollars
 
 ```{r loss_summary_amusement, echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -649,6 +657,43 @@ mapview(zones %>%
          licensestatus == "Active") %>% 
   st_join(., zones), zcol = "assembly_allowed" ,layer.name = "SAOL License")
 
+```
+
+These static maps represent the same information but are designed to be used in the Task Force written report or with printed materials.
+
+SAOL zoning status:
+
+```{r static_map2, echo=FALSE, fig.height=6, fig.width=6, message=FALSE, warning=FALSE}
+ggplot()+ 
+  geom_sf(data = phila_shp, fill = "black") + 
+  geom_sf(data = zones %>% 
+            filter(assembly_allowed %in% c("Special Exception", "By-Right")), 
+          aes(fill = assembly_allowed), 
+          color = "transparent",
+          alpha = 0.7)+ 
+  scale_fill_manual(values = c("blue", "yellow"))+
+  theme(legend.title=element_blank())+
+  mapTheme
+```
+
+
+SAOL license locations, by zoning status:
+
+
+```{r static_map1, echo=FALSE, message=FALSE, warning=FALSE, fig.height=6, fig.width=6,}
+ggplot()+ 
+  geom_sf(data = phila_shp, fill = "black") + 
+  geom_sf(data = licenses %>% 
+            filter(licensetype == "Special Assembly Occupancy", 
+                   licensestatus == "Active") %>% 
+            st_join(., zones) %>% 
+            filter(is.na(assembly_allowed) == FALSE), 
+          aes(color = assembly_allowed), 
+          size = .5,
+          alpha = 0.6) + 
+  scale_color_manual(values = c("blue",  "red" , "yellow"))+ 
+  theme(legend.title=element_blank())+
+  mapTheme
 ```
 
 
