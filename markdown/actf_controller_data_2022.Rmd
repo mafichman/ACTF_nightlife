@@ -59,7 +59,10 @@ mapTheme <- theme(plot.title =element_text(size=12),
                   plot.margin = margin(1, 1, 1, 1, 'cm'),
                   legend.key.height = unit(1, "cm"), legend.key.width = unit(0.2, "cm"))
 
-
+#the magic happens here - ggmap function
+ll <- function(dat, proj4 = 4326){
+  st_transform(dat, proj4)
+}
 
 wage_tax_revenue <- read_excel("~/GitHub/ACTF_nightlife/data/wage-tax-revenue.xlsx") %>%
   rename(Arts_Entertainment_Recreation = 'Arts, Entertainment, and Other Recreation') %>%
@@ -87,6 +90,10 @@ wage_tax_revenue_new <- read.csv("https://phl-budget-datasette.herokuapp.com/rev
 phila_shp <- counties("PA") %>%
   filter(NAME == "Philadelphia") %>%
   st_as_sf(crs = 4326)
+
+# Load districts from OpenDataPhilly
+councilDistricts <- st_read("https://opendata.arcgis.com/datasets/9298c2f3fa3241fbb176ff1e84d33360_0.geojson") %>%
+  st_transform(crs = 4326) 
 
 ```
 
@@ -696,10 +703,175 @@ ggplot()+
   mapTheme
 ```
 
+```{r get_basemap, echo=FALSE, message=FALSE, warning=FALSE}
+base_map <- get_stamenmap(bbox = unname(st_bbox(ll(st_buffer(phila_shp,1500)))),
+                          force = TRUE, maptype = "toner-lines", zoom = 11)
+```
+``` {r map_all, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggmap(base_map)+
+  geom_sf(data = ll(phila_shp), 
+          inherit.aes = FALSE,
+          fill = "transparent", 
+          color = "orange",
+          size = .5) +
+  geom_sf(data = ll(licenses %>% 
+                      filter(licensetype == "Special Assembly Occupancy", 
+                             licensestatus == "Active") %>% 
+                      st_join(., zones)) %>%
+            filter(is.na(assembly_allowed) == FALSE) %>%
+                      st_transform(st_crs(phila_shp)), 
+          aes(color = assembly_allowed),
+          inherit.aes = FALSE,,
+          size = 1.2,
+          alpha = 0.7)+
+  scale_color_manual(values = c("#e41a1c",  "#4daf4a" , "#377eb8"))+ 
+  theme(legend.title=element_blank())+
+  mapTheme
+
+```
+
+``` {r map_all_facet, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggmap(base_map)+
+  geom_sf(data = ll(phila_shp), 
+          inherit.aes = FALSE,
+          fill = "transparent", 
+          color = "blue",
+          size = 1) +
+  geom_sf(data = ll(licenses %>% 
+                      filter(licensetype == "Special Assembly Occupancy", 
+                             licensestatus == "Active") %>% 
+                      st_join(., zones)) %>%
+                      st_transform(st_crs(phila_shp)) %>%
+            filter(is.na(assembly_allowed) == FALSE), 
+          aes(color = assembly_allowed),
+          inherit.aes = FALSE,,
+          color = "red",
+          alpha = 0.7,
+          size = 1)+
+  theme(legend.title=element_blank())+
+  facet_wrap(~assembly_allowed)+
+  mapTheme
+
+```
+``` {r basemap_facet_zoom, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+base_map_zoom <- get_stamenmap(bbox = unname(st_bbox(ll(st_buffer(st_centroid(councilDistricts %>% 
+                                                                           filter(DISTRICT %in% c( 1, 3, 5))),20000)))),
+                          force = TRUE, maptype = "toner-lite", zoom = 12)
+```
+
+``` {r map_all_facet_zoom, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ggmap(base_map_zoom)+
+  geom_sf(data = councilDistricts %>% 
+            filter(DISTRICT %in% c( 1, 3, 5)) %>%
+            st_transform(crs = 4326), inherit.aes = FALSE,
+          fill = "transparent", color = "blue", size = .75, alpha = 0.4)
+  geom_sf(data = ll(licenses %>% 
+                      filter(licensetype == "Special Assembly Occupancy", 
+                             licensestatus == "Active") %>% 
+                      st_join(., zones)) %>%
+                      st_transform(st_crs(phila_shp)) %>%
+            filter(is.na(assembly_allowed) == FALSE), 
+          aes(color = assembly_allowed),
+          inherit.aes = FALSE,,
+          color = "red",
+          alpha = 0.7,
+          size = 1)+
+  theme(legend.title=element_blank())+
+  facet_wrap(~assembly_allowed)+
+  mapTheme
+
+```
+
+``` {r by_right, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+ggmap(base_map)+
+  geom_sf(data = ll(phila_shp), 
+          inherit.aes = FALSE,
+          fill = "transparent", 
+          color = "blue",
+          size = 1) +
+  geom_sf(data = ll(licenses %>% 
+                      filter(licensetype == "Special Assembly Occupancy", 
+                             licensestatus == "Active") %>% 
+                      st_join(., zones) %>% 
+                      filter(assembly_allowed == "By-Right") %>%
+                      st_transform(st_crs(phila_shp))), 
+          inherit.aes = FALSE,
+          color = "red",
+          size = 1,
+          alpha = 0.7)+
+  ggtitle("By Right") +
+  mapTheme
+
+```
+
+``` {r special_exception, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+ggmap(base_map)+
+  geom_sf(data = ll(phila_shp), 
+          inherit.aes = FALSE,
+          fill = "transparent", 
+          color = "blue") +
+  geom_sf(data = ll(licenses %>% 
+                      filter(licensetype == "Special Assembly Occupancy", 
+                             licensestatus == "Active") %>% 
+                      st_join(., zones) %>% 
+                      filter(assembly_allowed == "Special Exception") %>%
+                      st_transform(st_crs(phila_shp))), 
+          inherit.aes = FALSE,
+          color = "red",
+          size = 1,
+          alpha = 0.7)+
+  ggtitle("Special Exception") +
+  mapTheme
+
+```
+
+``` {r not_permitted, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+ggmap(base_map)+
+  geom_sf(data = ll(phila_shp), 
+          inherit.aes = FALSE,
+          fill = "transparent", 
+          color = "blue") +
+  geom_sf(data = ll(licenses %>% 
+                      filter(licensetype == "Special Assembly Occupancy", 
+                             licensestatus == "Active") %>% 
+                      st_join(., zones) %>% 
+                      filter(assembly_allowed == "Not Permitted") %>%
+                      st_transform(st_crs(phila_shp))), 
+          inherit.aes = FALSE,
+          color = "red",
+          size = 1,
+          alpha = 0.7)+
+  ggtitle("Not Permitted") +
+  mapTheme
+
+```
+
+```{r council districts, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+licenses %>% 
+            filter(licensetype == "Special Assembly Occupancy", 
+                   licensestatus == "Active") %>% 
+            st_join(., zones) %>% 
+            filter(is.na(assembly_allowed) == FALSE) %>%
+  as.data.frame() %>%
+  group_by(assembly_allowed, council_district) %>%
+  tally() %>%
+  ggplot()+
+  geom_bar(aes(x = council_district, y = n, fill= assembly_allowed), 
+           stat = "identity", position = "dodge")+
+  plotTheme
+
+```
 
 ## 4.3. SAOL issuance timeline
 
-There are currently 122 SAOLs active in Philly, and 88 of those license holders also have amusement licenses.
+There are currently 121 SAOLs active in Philly, and 88 of those license holders also have amusement licenses.
 
 Very few SAOLs are issued in Philly, and especially few the last two years. The following chart shows the date when SAOL's were issued. 2006 probably has data inflated by the start of the record-keeping period for these data.
 
@@ -712,8 +884,9 @@ licenses %>%
   ggplot()+
   geom_histogram(aes(y = n, x = year_opened), stat = "identity") +
   labs(title="Special Assembly Occupancy License Active Dates",
+       subtitle= "Data through May, 2022. Source: Philadelphia Dept. Of Licenses & Inspections",
        x="Year", 
-       y="Number of Licenses")+
+       y="Number of Licenses Activated")+
   plotTheme
 
 ```
@@ -723,20 +896,81 @@ Record numbers of licenses became inactive in 2020... The following chart shows 
 ```{r license_timeline_inactive, echo=FALSE, message=FALSE, warning=FALSE}
 licenses %>%
   filter(licensetype == "Special Assembly Occupancy",
-         is.na(inactivedate) == FALSE) %>%
-  mutate(year_closed = year(as.Date(inactivedate))) %>%
+         licensestatus != "Active") %>%
+  mutate(year_closed = year(as.Date(expirationdate))) %>%
   group_by(year_closed) %>%
   tally() %>%
   ggplot()+
   geom_histogram(aes(y = n, x = year_closed), stat = "identity") +
-  labs(title="Special Assembly Occupancy License Inactive Dates",
+  labs(title="Special Assembly Occupancy License Expiration Dates",
+       subtitle= "Data through May, 2022. Source: Philadelphia Dept. Of Licenses & Inspections",
+       x="Year", 
+       y="Number of Licenses Inactivated,")+
+  plotTheme
+
+```
+
+```{r license_timeline_inactive3, echo=FALSE, message=FALSE, warning=FALSE}
+licenses %>%
+  filter(licensetype == "Special Assembly Occupancy",
+         licensestatus != "Active") %>%
+  mutate(year = year(as.Date(expirationdate))) %>%
+  as.data.frame() %>%
+  group_by(year) %>%
+  tally() %>%
+  mutate(Action = "Expired") %>%
+  rbind(., 
+  licenses %>%
+  mutate(year = year(as.Date(initialissuedate))) %>%
+    filter(licensetype == "Special Assembly Occupancy") %>%
+    as.data.frame() %>%
+  group_by(year) %>%
+  tally() %>%
+  mutate(Action = "Activated")) %>%
+  filter(year < 2022 & year > 2005) %>%
+  ggplot()+
+  geom_line(aes(y = n, x = year, color = Action), stat = "identity") +
+  labs(title="Special Assembly Occupancy License Issuance and Closure",
+       subtitle= "Data through May, 2022. Source: Philadelphia Dept. Of Licenses & Inspections",
        x="Year", 
        y="Number of Licenses")+
   plotTheme
 
 ```
 
-## SAOLs and By-Right Zoning
+```{r license_timeline_inactive4, echo=FALSE, message=FALSE, warning=FALSE}
+licenses %>%
+  filter(licensetype == "Special Assembly Occupancy",
+         licensestatus != "Active") %>%
+  mutate(year = year(as.Date(expirationdate))) %>%
+  as.data.frame %>%
+  group_by(year) %>%
+  tally() %>%
+  rename(inactivated = n) %>%
+  full_join(., 
+  licenses %>%
+    filter(licensetype == "Special Assembly Occupancy") %>%
+  mutate(year = year(as.Date(initialissuedate))) %>%
+    as.data.frame() %>%
+  group_by(year) %>%
+  tally() %>%
+  rename(activated = n)) %>%
+  arrange(year) %>%
+  mutate(inactivated = ifelse(is.na(inactivated) == TRUE, 0, inactivated),
+    yearly_net = activated - inactivated,
+         active_licenses = cumsum(yearly_net)) %>%
+  filter(year >2009 & year < 2023) %>%
+  ggplot()+
+  geom_bar(aes(y = active_licenses, x = year), stat = "identity") +
+  labs(title="Active Special Assembly Occupancy Licenses",
+       subtitle= "Activations Minus Expirations By Year from Records 1/2005 - 5/2022. Source: Philadelphia Dept. Of Licenses & Inspections",
+       x="Year", 
+       y="Number of Licenses")+
+  plotTheme
+
+```
+
+## 4.4. SAOLs and By-Right Zoning
 
 Among active Special Assembly Occupancy Licenses, only 35 (28%) were permitted by right in the zones where they were created.
 
@@ -814,6 +1048,42 @@ licenses %>%
        y="Pct of total SAOLs")+
   plotTheme
   
+```
+
+# 5. Amusement Licenses
+
+Here is an activation/inactivation timeline for amusement licenses - these data appear to start being reliable in about 2015 - in 2014, hundreds of licenses were added to the register (possibly due to a recording sprint).
+
+```{r amusement_license_timeline_inactive3, echo=FALSE, message=FALSE, warning=FALSE}
+licenses %>%
+  filter(licensetype == "Amusement",
+         licensestatus != "Active") %>%
+  mutate(year = year(as.Date(expirationdate))) %>%
+  as.data.frame %>%
+  group_by(year) %>%
+  tally() %>%
+  rename(inactivated = n) %>%
+  full_join(., 
+  licenses %>%
+    filter(licensetype == "Amusement") %>%
+  mutate(year = year(as.Date(initialissuedate))) %>%
+    as.data.frame() %>%
+  group_by(year) %>%
+  tally() %>%
+  rename(activated = n)) %>%
+  arrange(year) %>%
+  mutate(inactivated = ifelse(is.na(inactivated) == TRUE, 0, inactivated),
+    yearly_net = activated - inactivated,
+         active_licenses = cumsum(yearly_net)) %>%
+  filter(year >2007 ) %>%
+  ggplot()+
+  geom_bar(aes(y = active_licenses, x = year), stat = "identity") +
+  labs(title="Active Amusement Licenses",
+       subtitle= "Activations Minus Expirations By Year from Records 1/2005 - 5/2022. Source: Philadelphia Dept. Of Licenses & Inspections",
+       x="Year", 
+       y="Number of Licenses")+
+  plotTheme
+
 ```
 
 Next steps - 

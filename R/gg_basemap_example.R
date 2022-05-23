@@ -22,6 +22,9 @@ ggmap(base_map)+
           color = "red",
           size = 1,
           alpha = 0.7)+
-  ggtitle("Philly and Surroundings") +
+  ggtitle("Special Assembly Occupancy Licenses by Zoning Status") +
   facet_wrap(~assembly_allowed)+
   mapTheme
+
+# OR #
+
