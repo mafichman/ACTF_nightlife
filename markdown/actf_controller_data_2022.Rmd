@@ -709,12 +709,14 @@ base_map <- get_stamenmap(bbox = unname(st_bbox(ll(st_buffer(phila_shp,1500)))),
 ```
 ``` {r map_all, echo=FALSE, message=FALSE, warning=FALSE}
 
-ggmap(base_map)+
+ggmap(base_map,
+      alpha = .8)+
   geom_sf(data = ll(phila_shp), 
           inherit.aes = FALSE,
           fill = "transparent", 
           color = "orange",
-          size = .5) +
+          size = .5,
+          alpha = 0.5) +
   geom_sf(data = ll(licenses %>% 
                       filter(licensetype == "Special Assembly Occupancy", 
                              licensestatus == "Active") %>% 
@@ -725,7 +727,7 @@ ggmap(base_map)+
           inherit.aes = FALSE,,
           size = 1.2,
           alpha = 0.7)+
-  scale_color_manual(values = c("#e41a1c",  "#4daf4a" , "#377eb8"))+ 
+  scale_color_manual(values = c("blue",  "red" , "yellow"))+ 
   theme(legend.title=element_blank())+
   mapTheme
 
@@ -758,21 +760,32 @@ ggmap(base_map)+
 ``` {r basemap_facet_zoom, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 
 base_map_zoom <- get_stamenmap(bbox = unname(st_bbox(ll(st_buffer(st_centroid(councilDistricts %>% 
-                                                                           filter(DISTRICT %in% c( 1, 3, 5))),20000)))),
-                          force = TRUE, maptype = "toner-lite", zoom = 12)
+                                              filter(DISTRICT %in% c( 1, 2, 3, 5))),6000)))),
+                          force = TRUE, maptype = "terrain", zoom = 12)
 ```
 
-``` {r map_all_facet_zoom, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+``` {r map_all_facet_zoom, echo=FALSE, message=FALSE, warning=FALSE}
 ggmap(base_map_zoom)+
   geom_sf(data = councilDistricts %>% 
-            filter(DISTRICT %in% c( 1, 3, 5)) %>%
+            #filter(DISTRICT %in% c( 1, 2, 3, 5)) %>%
             st_transform(crs = 4326), inherit.aes = FALSE,
-          fill = "transparent", color = "blue", size = .75, alpha = 0.4)
+          fill = "transparent", color = "blue", size = .75, alpha = 0.2)+
+  geom_sf_label(data = councilDistricts %>% 
+                  filter(DISTRICT != 1) %>%
+            st_transform(crs = 4326), inherit.aes = FALSE,
+            aes(label = DISTRICT),
+            label.size = 0.25)+
+  geom_sf_label(data = councilDistricts %>% 
+                  filter(DISTRICT == 1) %>%
+            st_transform(crs = 4326), inherit.aes = FALSE,
+            aes(label = DISTRICT),
+            label.size = 0.25,
+            nudge_y = -.02)+
   geom_sf(data = ll(licenses %>% 
                       filter(licensetype == "Special Assembly Occupancy", 
                              licensestatus == "Active") %>% 
                       st_join(., zones)) %>%
-                      st_transform(st_crs(phila_shp)) %>%
+                      st_transform(st_crs(4326)) %>%
             filter(is.na(assembly_allowed) == FALSE), 
           aes(color = assembly_allowed),
           inherit.aes = FALSE,,
@@ -927,7 +940,7 @@ licenses %>%
   group_by(year) %>%
   tally() %>%
   mutate(Action = "Activated")) %>%
-  filter(year < 2022 & year > 2005) %>%
+  filter(year < 2022 & year > 2006) %>%
   ggplot()+
   geom_line(aes(y = n, x = year, color = Action), stat = "identity") +
   labs(title="Special Assembly Occupancy License Issuance and Closure",
