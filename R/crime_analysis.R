@@ -48,8 +48,8 @@ mapTheme <- theme(plot.title =element_text(size=12),
 
 
 # https://cityofphiladelphia.github.io/carto-api-explorer/#incidents_part1_part2
-# Jan 1, 2018 to June 7, 2022
-philaCrime <- read.csv("https://phl.carto.com/api/v2/sql?filename=incidents_part1_part2&format=csv&q=SELECT%20*%20,%20ST_Y(the_geom)%20AS%20lat,%20ST_X(the_geom)%20AS%20lng%20FROM%20incidents_part1_part2%20WHERE%20dispatch_date_time%20%3E=%20%272018-01-01%27%20AND%20dispatch_date_time%20%3C%20%272022-06-06%27") #%>%
+# Jan 1, 2017 to June 10, 2022
+philaCrime <- read.csv("https://phl.carto.com/api/v2/sql?filename=incidents_part1_part2&format=csv&q=SELECT%20*%20,%20ST_Y(the_geom)%20AS%20lat,%20ST_X(the_geom)%20AS%20lng%20FROM%20incidents_part1_part2%20WHERE%20dispatch_date_time%20%3E=%20%272017-01-01%27%20AND%20dispatch_date_time%20%3C%20%272022-06-10%27") #%>%
   #filter(str_detect(text_general_code, "Assault") == TRUE)
 
 # Keep only violent crime types, fix typos in homicide data entry,
@@ -87,6 +87,19 @@ ggplot()+
   facet_wrap(~after_six)+
   plotTheme
 
+violentCrime %>%
+  filter(year > 2020) %>%
+  filter(text_general_code %in% c("Aggravated Assault Firearm", 
+                                  "Robbery Firearm", 
+                                  "Homicide - Criminal", 
+                                  "Homicide - Criminal ")) %>%
+  group_by(hour, dotw) %>%
+  tally() %>%
+  ggplot()+
+  geom_line(aes(x= hour, y = n))+
+  facet_wrap(~dotw)+
+  plotTheme
+
 # Make the crime data spatial using lat/lon
 # Filter out data with bad/wrong lat/lon ~ 3K observations
 
@@ -101,12 +114,12 @@ violentCrime_shp <- violentCrime %>%
 # Create 100 ft buffers around current licenses
 # Then do a similar thing for older licenses for comparison - maybe 2018 or 19
 
-licenses <- st_read("https://phl.carto.com/api/v2/sql?q=SELECT+*+FROM+business_licenses&filename=business_licenses&format=geojson&skipfields=cartodb_id") %>%
+nightLicenses <- st_read("https://phl.carto.com/api/v2/sql?q=SELECT+*+FROM+business_licenses&filename=business_licenses&format=geojson&skipfields=cartodb_id") %>%
   filter(licensetype %in% c("Amusement", "Special Assembly Occupancy", "Sidewalk Cafe") |
            str_detect(licensetype, "Food Estab")) %>%
   st_transform(crs = 2272)
   
-current_buffer <- licenses %>%
+current_buffer <- nightLicenses %>%
   filter(licensestatus == "Active") %>%
   st_union() %>%
   st_buffer(200) %>%
@@ -279,6 +292,7 @@ st_join(violentCrime_shp %>%
   pivot_wider(names_from = year, values_from = n) %>%
   left_join(., corridors %>%
               select(NAME), by = c("NAME")) %>%
+  mutate(Total_2017_2022 = sum())
   st_as_sf() %>%
   st_transform(2272) %>%
   mapView(zcol = "2021")
@@ -294,7 +308,7 @@ plots <- st_join(violentCrime_shp %>%
         corridors) %>%
   filter(is.na(NAME) == FALSE) %>%
   filter(after_six == "6PM - 6AM") %>%
-  filter(str_detect(NAME, "South")) %>%
+  #filter(str_detect(NAME, "South")) %>%
   group_by(NAME, year) %>%
   tally() %>%
   as_tibble() %>%
@@ -308,3 +322,100 @@ plots <- st_join(violentCrime_shp %>%
        x="Month", 
        y="Number of Reported Incidents")+
   plotTheme)
+
+
+# Near establishments and in corridors
+
+st_join(violentCrime_shp %>% 
+          filter(text_general_code %in% c("Aggravated Assault Firearm", 
+                                          "Robbery Firearm", 
+                                          "Homicide - Criminal", 
+                                          "Homicide - Criminal ")), nightLicenses %>%
+          st_buffer(200) %>%
+          st_as_sf(crs = 2272) %>%
+          select(initialissuedate, expirationdate, address, 
+                 opa_account_num, parcel_id_num, opa_owner, licensenum, licensetype,
+                 licensestatus, legalname, business_name, business_mailing_address)) %>%
+  mutate(Proximate_To_License = ifelse(is.na(legalname) == TRUE, 
+                                       "Over 200 ft Away", "Within 200 ft")) %>%
+  mutate(activeLicense = ifelse(interval60 > initialissuedate & interval60 < expirationdate, 
+                                "Active", "Inactive")) %>% 
+  st_join(., corridors) %>%
+  filter(is.na(NAME) == FALSE) %>%
+  filter(after_six == "6PM - 6AM") %>% 
+  group_by(objectid, activeLicense) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  filter(activeLicense != "Inactive" & Proximate_To_License == "Within 200 ft") %>%
+  group_by(NAME, year) %>% 
+  tally() %>% 
+  rename(Buffer_200ft = n) %>% 
+  View()
+
+
+st_join(violentCrime_shp %>% 
+          filter(text_general_code %in% c("Aggravated Assault Firearm", 
+                                          "Robbery Firearm", 
+                                          "Homicide - Criminal", 
+                                          "Homicide - Criminal ")), nightLicenses %>%
+          st_buffer(200) %>%
+          st_as_sf(crs = 2272) %>%
+          select(initialissuedate, expirationdate, address, 
+                 opa_account_num, parcel_id_num, opa_owner, licensenum, licensetype,
+                 licensestatus, legalname, business_name, business_mailing_address)) %>%
+  mutate(Proximate_To_License = ifelse(is.na(legalname) == TRUE, 
+                                       "Over 200 ft Away", "Within 200 ft")) %>%
+  mutate(activeLicense = ifelse(interval60 > initialissuedate & interval60 < expirationdate, 
+                                "Active", "Inactive")) %>% 
+  st_join(., corridors) %>%
+  filter(is.na(NAME) == FALSE) %>%
+  #filter(after_six == "6PM - 6AM") %>% 
+  group_by(objectid, activeLicense) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  filter(activeLicense != "Inactive" & Proximate_To_License == "Within 200 ft") %>%
+  group_by(dotw, hour) %>% 
+  tally() %>% 
+  ggplot()+
+  geom_line(aes(y = n, x = hour))+
+  facet_wrap(~dotw)+
+  plotTheme
+
+
+# Total incidents near premises vs not
+
+st_join(violentCrime_shp %>% 
+          filter(text_general_code %in% c("Aggravated Assault Firearm", 
+                                          "Robbery Firearm", 
+                                          "Homicide - Criminal", 
+                                          "Homicide - Criminal ")), nightLicenses %>%
+          st_buffer(200) %>%
+          st_as_sf(crs = 2272) %>%
+          select(initialissuedate, expirationdate, address, 
+                 opa_account_num, parcel_id_num, opa_owner, licensenum, licensetype,
+                 licensestatus, legalname, business_name, business_mailing_address)) %>%
+  mutate(Proximate_To_License = ifelse(is.na(legalname) == TRUE, 
+                                       "Over 200 ft Away", "Within 200 ft")) %>%
+  mutate(activeLicense = ifelse(interval60 > initialissuedate & interval60 < expirationdate, 
+                                "Active", "Inactive")) %>% 
+  st_join(., corridors) %>%
+  filter(is.na(NAME) == FALSE) %>%
+  filter(after_six == "6PM - 6AM") %>% 
+  group_by(objectid, activeLicense) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  filter(activeLicense != "Inactive" & Proximate_To_License == "Within 200 ft") %>%
+  group_by(year) %>%
+  tally() %>% 
+  rename(Near_License = n) %>%
+  as.data.frame(-geometry) %>%
+  left_join(., violentCrime %>%
+              filter(text_general_code %in% c("Aggravated Assault Firearm", 
+                                              "Robbery Firearm", 
+                                              "Homicide - Criminal", 
+                                              "Homicide - Criminal ")) %>%
+              filter(after_six == "6PM - 6AM") %>% 
+              group_by(year) %>%
+              tally()) %>%
+  as.data.frame() %>%
+  select(-geometry)
