@@ -99,11 +99,11 @@ councilDistricts <- st_read("https://opendata.arcgis.com/datasets/9298c2f3fa3241
 
 # About
 
-This document contains analysis of recent data regarding wage taxes, licensing, zoning, and mobility related to Philadelphia's nighttime economy.
+This document contains analysis of recent data regarding wage taxes, licensing, zoning, and mobility related to Philadelphia's nighttime economy. These analyses are internal research by Philadelphia City Council's Arts and Culture Task Force, Nightlife Committee. They are presented here for public documentation, reproducibility, and transparency.
 
 Analysis by Michael Fichman of Philadelphia City Council's Arts and Culture Task Force, Nightlife Committee. 
 
-Wage tax revenue data obtained from Philadelphia Controller's Office, updated for the 2021 tax year, 3/8/2022. All other data obtained from Open Data Philly or Indigo Bike Share, April, 2022.
+Wage tax revenue data obtained from Philadelphia Controller's Office, updated for the 2021 tax year, 3/8/2022. All other data obtained from Open Data Philly or Indigo Bike Share in April, May and June of 2022.
 
 For code base used to synthesize these data, refer to the code download button at the top of this document or visit the github repository for this page - https://github.com/mafichman/ACTF_nightlife
 
@@ -707,7 +707,7 @@ ggplot()+
 base_map <- get_stamenmap(bbox = unname(st_bbox(ll(st_buffer(phila_shp,1500)))),
                           force = TRUE, maptype = "toner-lines", zoom = 11)
 ```
-``` {r map_all, echo=FALSE, message=FALSE, warning=FALSE}
+``` {r map_all, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 
 ggmap(base_map,
       alpha = .8)+
@@ -1110,7 +1110,9 @@ How good are these data, really?
 
 There is ongoing concern about gun crime in Philadelphia. Gun crime is rising for the city as a whole. 2021 was a particularly bad year for gun crime. [According to FBI's uniform crime report](https://crime-data-explorer.app.cloud.gov/pages/explorer/crime/crime-trend), national rates of violent crime are down substantially from peak recorded levels in the 1990s.
 
-This section analyzes Philadelphia Police Department (PPD) firearm incident reports from January, 2017 to June, 2022 in relation to the location of restaurants, special assembly occupancy licenses and entertainment licenses. We do not have specific information about when specific establishments open or close.
+This section analyzes [Philadelphia Police Department (PPD) firearm incident reports](https://www.opendataphilly.org/dataset/crime-incidents) from January, 2017 to June, 2022 in relation to the location of Commerce Dept. designated [commercial corridors]https://www.opendataphilly.org/dataset/commercial-corridors, and the location of [food service, sidewalk cafe, special assembly occupancy, and entertainment licenses](https://www.opendataphilly.org/dataset/licenses-and-inspections-business-licenses). We do not have specific information about when specific establishments open or close.
+
+Keep in mind that these are reported incidents - subject to bias in observation, reporting, and classification.
 
 The major takeaways from our analysis are as follows:
 
@@ -1124,7 +1126,7 @@ The major takeaways from our analysis are as follows:
 
 5. Eastern segments of South Street are some of the highest traffic local nightlife corridors and draw a very wide scope of visitors, but have comparatively low frequencies of incidents.
 
-```{load_crime_data, echo=FALSE, message=FALSE, warning=FALSE}
+```{r load_crime_data, echo=FALSE, message=FALSE, warning=FALSE}
 # https://cityofphiladelphia.github.io/carto-api-explorer/#incidents_part1_part2
 # Jan 1, 2017 to June 27, 2022
 philaCrime <- read.csv("https://phl.carto.com/api/v2/sql?filename=incidents_part1_part2&format=csv&q=SELECT%20*%20,%20ST_Y(the_geom)%20AS%20lat,%20ST_X(the_geom)%20AS%20lng%20FROM%20incidents_part1_part2%20WHERE%20dispatch_date_time%20%3E=%20%272017-01-01%27%20AND%20dispatch_date_time%20%3C%20%272022-06-27%27")
@@ -1154,14 +1156,30 @@ violentCrime <- philaCrime %>%
          hour = hour(hms(dispatch_time))) %>%
   mutate(after_six = ifelse(hour > 17 | hour < 7, "6PM - 6AM", "6AM - 6PM"))
 
+# Spatialize data, drop data without spatial info
+
+violentCrime_shp <- violentCrime %>%
+  filter(point_y > 1,
+         point_x > -76,
+         point_x < -73) %>%
+  st_as_sf(coords = c("lng", "lat"), crs = 4326) %>%
+  st_transform(2272)
+
 # Take the licenses for restaurants, amusement, assembly, food establishment
-# Create 100 ft buffers around current licenses
+# Create 200 ft buffers around current licenses
 # Then do a similar thing for older licenses for comparison - maybe 2018 or 19
 
 nightLicenses <- st_read("https://phl.carto.com/api/v2/sql?q=SELECT+*+FROM+business_licenses&filename=business_licenses&format=geojson&skipfields=cartodb_id") %>%
   filter(licensetype %in% c("Amusement", "Special Assembly Occupancy", "Sidewalk Cafe") |
            str_detect(licensetype, "Food Estab")) %>%
   st_transform(crs = 2272)
+
+current_buffer <- nightLicenses %>%
+  filter(licensestatus == "Active") %>%
+  st_union() %>%
+  st_buffer(200) %>%
+  st_as_sf(crs = 2272) %>%
+  mutate(in_buffer = "in buffer")
 
 # Load Corridors
 
@@ -1175,12 +1193,49 @@ corridors <- st_read("https://opendata.arcgis.com/datasets/f43e5f92d34e41249e7a1
 
 We examined a category of incidents recorded between January 1, 2017 and June 27, 2022 - incidents classified by the PPD as Criminal Homicide, Robbery with a Firearm, Aggravated Assault with a Firearm.
 
-Most gun crime, overall, happens in the evening, between about 11 PM and 1AM, with much of it concentrated around midnight. 
+```{r total_gun_incidents, echo=FALSE, warning = FALSE, message = FALSE}
+violentCrime %>%
+    filter(text_general_code %in% c("Aggravated Assault Firearm", 
+                                    "Robbery Firearm", 
+                                    "Homicide - Criminal", 
+                                    "Homicide - Criminal ")) %>%
+    group_by(text_general_code, year, month) %>%
+    tally() %>%
+    mutate(date = lubridate::my(paste(month, year))) %>%
+    ggplot()+
+    geom_line(aes(x = date, y = n, color = text_general_code))+
+    ylim(0, 500)+
+    labs(title="Monthly Firearm Incidents By Type, 2017-2022",
+         subtitle= "Source: Philadelphia Police Dept.",
+         x="Year", 
+         y="Monthly Reported Incidents")+
+    plotTheme
 
-The following plots show all firearm incidents since 2020, broken down by day of the week and hour reported. The 12PM (0h) time of day has the highest reporting count by far of any time of day.
+```
 
 ```{r day_and_time, echo=FALSE, warning = FALSE, message = FALSE }
 
+violentCrime %>%
+  filter(text_general_code %in% c("Aggravated Assault Firearm", 
+                                  "Robbery Firearm", 
+                                  "Homicide - Criminal", 
+                                  "Homicide - Criminal ")) %>%
+  group_by(after_six, year, month) %>%
+  tally() %>%
+  mutate(date = lubridate::my(paste(month, year))) %>%
+  ggplot()+
+  geom_line(aes(x = date, y = n, color = after_six))+
+    ylim(0, 500)+
+  labs(title="Monthly Firearm Incidents By Time of Day, 2017-2022",
+       subtitle= "Homicide, Aggravated Assault, Robbery with Firearms.\n Source: Philadelphia Police Dept.",
+       x="Year", 
+       y="Monthly Reported Incidents")+
+  plotTheme
+```
+
+Most gun crime, overall, happens in the evening, between about 11 PM and 1AM, with much of it concentrated around midnight. 
+
+```{r all_crimes_day, echo=FALSE, warning = FALSE, message = FALSE}
 violentCrime %>%
   filter(year > 2020) %>%
   filter(text_general_code %in% c("Aggravated Assault Firearm", 
@@ -1192,11 +1247,20 @@ violentCrime %>%
   ggplot()+
   geom_line(aes(x= hour, y = n))+
   facet_wrap(~dotw)+
+  labs(title="Hourly Reported Firearm Incidents, 2017-2022",
+       subtitle= "Homicide and Aggravated Assault, Robbery with Firearms.\n Source: Philadelphia Police Dept.",
+       x="Hour of the Day", 
+       y="Hourly Reported Incidents")+
   plotTheme
+
 ```
+
+The following plots show all firearm incidents since 2020, broken down by day of the week and hour reported. The 12PM (0h) time of day has the highest reporting count by far of any time of day. It is unclear how much of that is related to record-keeping practices, but it doesn't seem like there's a pattern.
+
+
 ## 6.2. Spatial Pattern of Nighttime Incidents
 
-We related these firearm incidents to two types of data, wanting to know how frequently incidents were happening near hospitality locations at night.
+We related these firearm incidents (and other violent crime incidents) to two types of data, wanting to know how frequently incidents were happening near hospitality locations at night.
 
 1. Philadelphia Licenses and Inspections records of Amusement, Special Assembly Occupancy Licenses, Sidewalk Cafe licenses, and any type of Food Establishment License. and 
 
@@ -1204,12 +1268,39 @@ We related these firearm incidents to two types of data, wanting to know how fre
 
 Keep in mind - we do not know particularly when these establishments are open and closed. We don't know if an incident at 11PM outside a restaurant happens while that restaurant is in active operation. We filtered out incidents that took place near license locations when those licenses were not active (e.g. before they were created).
 
+-----
+
+We examined a wide variety of violent crimes in commercial corridors and within 200 feet of restaurants, assembly and amusement businesses. This timeline shows that at any time of day, any day of the week, there are far more incidents of aggravated assault, robbery, theft, rape, sexual crimes, and homicide away from areas of hospitality activity.
+
+It is substantially more likely one will be exposed to a violent crime at almost any hour of the day away from a licensed establishment at any time of day, as compared to a weekend night near a licensed establishment.
+
+```{r all_crimes_200_ft, echo=FALSE, warning = FALSE, message = FALSE}
+st_join(violentCrime_shp %>% 
+          filter(year > 2020) %>%
+          filter(text_general_code %in% c("Aggravated Assault Firearm", 
+                                          "Aggravated Assault No Firearm", 
+                                          "Robbery Firearm", 
+                                          "Robbery No Firearm", 
+                                          "Homicide - Criminal", 
+                                          "Homicide - Criminal ", 
+                                          "Rape", 
+                                          "Other Sex Offenses (Not Commercialized)")), current_buffer) %>%
+  mutate(Proximate_To_License = ifelse(is.na(in_buffer) == TRUE, "Over 200 ft Away", "Within 200 ft")) %>%
+  group_by(Proximate_To_License, dotw, hour) %>%
+  tally() %>%
+    ggplot()+
+    geom_bar(aes(x = hour, y = n, fill = Proximate_To_License), 
+             stat = "identity", position = "dodge")+
+  facet_wrap(~dotw)+
+  labs(title="Hourly Reported Violent Crimes, 2021-2022 by \nProximity to Hopsitality Licenses",
+       subtitle= "Homicide, Aggravated Assault, Rape, Sex Offenses, Robbery - with and without Firearms. \nSource: Philadelphia Dept. Of Commerce, Dept. Licenses and Inspections, Philadelphia Police Dept.",
+       x="Hour of the Day", 
+       y="Number of Reported Incidents")+
+  plotTheme
+
+```
+
 On average, commercial corridors have about as many incidents city-wide at 4PM as they do at 10 or PM. For the most part, violence on corridors does not spike on weekends, surprisingly.
-
-
-
-
-We examined firearm incidents in commercial corridors and within 200 feet of restaurants, assembly and amusement businesses. Incident count is lower than outside these areas (residential, industrial, etc). 
 
 Incidents in commercial areas, near establishments make up 10-15% of incidents city-wide at night - a steady rate for over 5 years. (As of 6/10, 1950 total incidents 6PM-6AM, 222 w/in 200 ft of a business in a corridor). We don't have info about specific open/close hours to know exactly what businesses might have been open during what incidents.
 
@@ -1230,7 +1321,8 @@ st_join(violentCrime_shp %>%
   filter(after_six == "6PM - 6AM") %>%
   ggplot()+
   geom_line(aes(x = date, y = n, color = in_Corridor))+
-  labs(title="Monthly Nighttime Firearm Incidents Inside and Outside Commercial Corridors, 2018-2022",
+      ylim(0, 400)+
+  labs(title="Monthly Nighttime Firearm Incidents Inside and Outside Commercial Corridors, 2017-2022",
        subtitle= "Homicide and Aggravated Assault, Robbery with Firearms. 6PM-6AM.\n Source: Philadelphia Dept. Of Licenses & Inspections, Philadelphia Police Dept.",
        x="Year", 
        y="Number of Reported Incidents")+
@@ -1258,11 +1350,13 @@ st_join(violentCrime_shp %>%
   geom_line(aes(x = date, y = n, color = Proximate_To_License))+
   labs(title="Monthly Nighttime Firearm Incidents By Proximity to\nAssembly, Restaurant or Amusement License, 2018-2022",
        subtitle= "Homicide, Aggravated Assault, Robbery with  Firearms.6PM-6AM.\n Source: Philadelphia Dept. Of Licenses & Inspections, Philadelphia Police Dept.",
-       x="Month", 
+       x="Year", 
        y="Number of Reported Incidents")+
   plotTheme
 
 ```
+
+## 6.3. Interactive Map of Commercial Corridors
 
 This interactive map shows the total number of firearm incidents 6PM-6AM since 2017 reported in the City's commercial corridors. Hover over each specific area to see a breakdown of incidents by year.
 
@@ -1384,7 +1478,7 @@ dat2 <- dat %>%
 ```
 
 
-```{r mobility_trends, warning = FALSE, echo = TRUE, message = FALSE, eval = FALSE}
+```{r mobility_trends, warning = FALSE, echo = TRUE, message = FALSE, eval = FALSE, include = FALSE}
 ggplot(dat2 %>%
          group_by(week) %>%
          tally())+

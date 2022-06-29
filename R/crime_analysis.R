@@ -150,7 +150,7 @@ st_join(violentCrime_shp %>%
   labs(title="Violent Crimes, 2021-2022 by Proximity to Restaurant, Assembly, and Amusement Licenses",
        subtitle= "Homicide, Aggravated Assault, Rape, Robbery, Theft - with and without Firearms. Source: Philadelphia Dept. Of Licenses & Inspections, Philadelphia Police Dept.",
        x="Hour of the Day", 
-       y="Number of Licenses")+
+       y="Number of Reported Incidents")+
   plotTheme
 
 # Gun crime relative to license locations
@@ -193,7 +193,7 @@ st_join(violentCrime_shp %>%
   ggplot()+
   geom_line(aes(x = date, y = n, color = Proximate_To_License))+
   labs(title="Monthly Nighttime Firearm Incidents By Proximity to\nAssembly, Restaurant or Amusement License, 2018-2022",
-       subtitle= "Homicide, Aggravated Assault, Rape, Robbery, Theft - with and without Firearms.6PM-6AM.\n Source: Philadelphia Dept. Of Licenses & Inspections, Philadelphia Police Dept.",
+       subtitle= "Homicide, Aggravated Assault,Robbery with Firearms.6PM-6AM.\n Source: Philadelphia Dept. Of Licenses & Inspections, Philadelphia Police Dept.",
        x="Month", 
        y="Number of Reported Incidents")+
   plotTheme
@@ -290,12 +290,19 @@ st_join(violentCrime_shp %>%
   as.data.frame() %>%
   select(-geometry) %>%
   pivot_wider(names_from = year, values_from = n) %>%
+  mutate(`2017` = ifelse(is.na(`2017`) == TRUE, 0, `2017`),
+         `2018` = ifelse(is.na(`2018`) == TRUE, 0, `2018`),
+         `2019` = ifelse(is.na(`2019`) == TRUE, 0, `2019`),
+         `2020` = ifelse(is.na(`2020`) == TRUE, 0, `2020`),
+         `2021` = ifelse(is.na(`2021`) == TRUE, 0, `2021`),
+         `2022` = ifelse(is.na(`2022`) == TRUE, 0, `2022`))%>%
   left_join(., corridors %>%
               select(NAME), by = c("NAME")) %>%
-  mutate(Total_2017_2022 = sum())
+  mutate(Incidents_Since_2017 = `2017`+ `2018` + `2019` + `2020` + `2021` + `2022`) %>%
+  relocate(`2020`, .after = `2019`) %>%
   st_as_sf() %>%
   st_transform(2272) %>%
-  mapView(zcol = "2021")
+  mapView(zcol = "Incidents_Since_2017")
 
 # Try to pop up some plots - this isn't working yet.
 # Look here - https://stackoverflow.com/questions/61686111/how-to-fix-distorted-interactive-popup-of-ggplot-figure-in-leaflet-map
